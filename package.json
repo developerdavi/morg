@@ -1,0 +1,41 @@
+{
+  "name": "@devdavi/morg",
+  "version": "0.1.0",
+  "description": "Developer productivity assistant CLI",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "morg": "./dist/index.js" },
+  "files": ["dist"],
+  "engines": { "node": ">=20.0.0" },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm run build && pnpm run typecheck",
+    "link:local": "pnpm link --global"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@clack/prompts": "^0.9.1",
+    "@slack/web-api": "^7.14.1",
+    "boxen": "^8.0.0",
+    "chalk": "^5.4.1",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.0",
+    "execa": "^9.6.0",
+    "figures": "^6.1.0",
+    "ora": "^8.2.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0",
+    "prettier": "^3.5.0"
+  }
+}
