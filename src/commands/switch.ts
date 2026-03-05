@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
 import { getCurrentBranch, stashPop, checkout } from '../git/index';
-import { isTicketId } from '../utils/ticket';
+import { isTicketId, findBranchCaseInsensitive } from '../utils/ticket';
 import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
@@ -37,7 +37,9 @@ async function runSwitch(input?: string): Promise<void> {
   } else if (isTicketId(input)) {
     const ticketId = input.trim().toUpperCase();
     const branches = await configManager.getBranches(projectId);
-    const branch = branches.branches.find((b) => b.ticketId === ticketId && b.status === 'active');
+    const branch = branches.branches.find(
+      (b) => b.ticketId?.toUpperCase() === ticketId && b.status === 'active',
+    );
     if (!branch) {
       console.error(theme.error(`No active branch found for ticket ${ticketId}.`));
       console.error(theme.muted(`Use: morg start ${ticketId}`));
@@ -45,12 +47,15 @@ async function runSwitch(input?: string): Promise<void> {
     }
     branchName = branch.branchName;
   } else {
-    branchName = input;
+    // Case-insensitive branch name lookup
+    const branches = await configManager.getBranches(projectId);
+    const found = findBranchCaseInsensitive(branches.branches, input);
+    branchName = found?.branchName ?? input;
   }
 
   // Check if branch has a worktree
   const branches = await configManager.getBranches(projectId);
-  const branch = branches.branches.find((b) => b.branchName === branchName);
+  const branch = findBranchCaseInsensitive(branches.branches, branchName);
 
   if (branch?.worktreePath) {
     // Update lastAccessedAt

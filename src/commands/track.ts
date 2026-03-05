@@ -4,7 +4,7 @@ import { getCurrentBranch } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { fetchTicket } from '../utils/providers';
-import { isTicketId } from '../utils/ticket';
+import { isTicketId, findBranchCaseInsensitive } from '../utils/ticket';
 
 async function runTrack(branch?: string, ticket?: string): Promise<void> {
   const projectId = await requireTrackedRepo();
@@ -28,7 +28,7 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
   }
 
   const branchesFile = await configManager.getBranches(projectId);
-  const existing = branchesFile.branches.find((b) => b.branchName === branchName);
+  const existing = findBranchCaseInsensitive(branchesFile.branches, branchName);
 
   if (existing) {
     if (ticketId) {
@@ -37,10 +37,12 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
       existing.updatedAt = new Date().toISOString();
       await configManager.saveBranches(projectId, branchesFile);
       console.log(
-        theme.success(`${symbols.success} Updated branch ${branchName} → ticket ${ticketId}`),
+        theme.success(
+          `${symbols.success} Updated branch ${existing.branchName} → ticket ${ticketId}`,
+        ),
       );
     } else {
-      console.log(theme.muted(`Branch ${branchName} is already tracked.`));
+      console.log(theme.muted(`Branch ${existing.branchName} is already tracked.`));
     }
     return;
   }
