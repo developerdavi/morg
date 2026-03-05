@@ -32,29 +32,30 @@ async function runPrCreate(options: { ai: boolean; draft?: boolean }): Promise<v
     validate: (v) => (v.trim() ? undefined : 'Required'),
   });
 
-  let body = '';
+  let bodyDefault = '';
   if (options.ai) {
-    try {
-      const globalConfig = await configManager.getGlobalConfig();
-      if (!globalConfig.anthropicApiKey) {
-        console.log(theme.warning('No Anthropic API key — skipping AI description. Run: morg config'));
-        options.ai = false;
-        throw new Error('skip');
+    const globalConfig = await configManager.getGlobalConfig();
+    if (globalConfig.anthropicApiKey) {
+      try {
+        const diff = await withSpinner('Getting diff...', () => getDiffWithBase(defaultBranch));
+        const claude = new ClaudeClient(globalConfig.anthropicApiKey);
+        bodyDefault = await withSpinner('Generating PR description with Claude...', () =>
+          claude.complete(
+            prDescriptionPrompt(diff, currentBranch, task?.ticketTitle ?? undefined),
+            SYSTEM_PR_DESCRIPTION,
+          ),
+        );
+      } catch {
+        // Best-effort — proceed with empty body
       }
-      const diff = await withSpinner('Getting diff...', () => getDiffWithBase(defaultBranch));
-      const claude = new ClaudeClient(globalConfig.anthropicApiKey);
-      body = await withSpinner('Generating PR description with Claude...', () =>
-        claude.complete(
-          prDescriptionPrompt(diff, currentBranch, task?.ticketTitle ?? undefined),
-          SYSTEM_PR_DESCRIPTION,
-        ),
-      );
-      console.log(theme.muted('\nGenerated description:'));
-      console.log(theme.dim(body.slice(0, 400) + (body.length > 400 ? '...' : '')));
-    } catch {
-      console.log(theme.warning('Could not generate AI description — creating with empty body.'));
     }
   }
+
+  const body = await text({
+    message: 'PR body (optional)',
+    initialValue: bodyDefault,
+    placeholder: 'Leave blank to skip',
+  });
 
   const remoteHasBase = (await execa('git', ['ls-remote', '--exit-code', 'origin', defaultBranch], { reject: false })).exitCode === 0;
   if (!remoteHasBase) {
@@ -102,7 +103,7 @@ async function runPrReview(options: { ai?: boolean }): Promise<void> {
     if (options.ai) {
       try {
         const globalConfig = await configManager.getGlobalConfig();
-        if (!globalConfig.anthropicApiKey) throw new Error('No API key');
+        if (!globalConfig.anthropicApiKey) continue;
         const diff = await withSpinner(`  Getting diff for #${pr.number}...`, () =>
           ghClient.getPRDiff(pr.number),
         );
