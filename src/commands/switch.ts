@@ -11,13 +11,35 @@ import { isTicketId } from '../utils/ticket';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
+import { select } from '../ui/prompts';
 
-async function runSwitch(input: string): Promise<void> {
+async function pickBranch(projectId: string, currentBranch: string): Promise<string> {
+  const tasks = await configManager.getTasks(projectId);
+  const choices = tasks.tasks
+    .filter((t) => ['active', 'pr_open'].includes(t.status) && t.branchName !== currentBranch)
+    .map((t) => ({
+      value: t.branchName,
+      label: t.branchName,
+      hint: t.ticketId ? `${t.ticketId}${t.ticketTitle ? ` · ${t.ticketTitle}` : ''}` : undefined,
+    }));
+
+  if (choices.length === 0) {
+    console.log(theme.muted('No other tracked branches to switch to.'));
+    process.exit(0);
+  }
+
+  return select({ message: 'Switch to', options: choices });
+}
+
+async function runSwitch(input?: string): Promise<void> {
   const projectId = await requireTrackedRepo();
 
   let branchName: string;
 
-  if (isTicketId(input)) {
+  if (!input) {
+    const current = await getCurrentBranch();
+    branchName = await pickBranch(projectId, current);
+  } else if (isTicketId(input)) {
     const ticketId = input.trim().toUpperCase();
     const tasks = await configManager.getTasks(projectId);
     const task = tasks.tasks.find((t) => t.ticketId === ticketId && t.status === 'active');
@@ -52,7 +74,7 @@ async function runSwitch(input: string): Promise<void> {
 
 export function registerSwitchCommand(program: Command): void {
   program
-    .command('switch <branch-or-ticket>')
+    .command('switch [branch-or-ticket]')
     .description('Switch to a branch (stashing if dirty)')
     .action(runSwitch);
 }

@@ -32,12 +32,16 @@ export class GhClient {
   }
 
   async createPR(opts: { title: string; body: string; base?: string; draft?: boolean }): Promise<GhPr> {
-    const args = ['pr', 'create', '--title', opts.title, '--body', opts.body, '--json', PR_FIELDS];
+    const args = ['pr', 'create', '--title', opts.title, '--body', opts.body];
     if (opts.base) args.push('--base', opts.base);
     if (opts.draft) args.push('--draft');
     const result = await execa('gh', args, { reject: false });
     if (result.exitCode !== 0) throw new IntegrationError(`gh pr create failed: ${result.stderr}`, 'github');
-    return GhPrSchema.parse(JSON.parse(result.stdout));
+    // gh pr create outputs the PR URL — fetch structured data with a follow-up view call
+    const url = result.stdout.trim();
+    const view = await execa('gh', ['pr', 'view', url, '--json', PR_FIELDS], { reject: false });
+    if (view.exitCode !== 0) throw new IntegrationError(`gh pr view failed: ${view.stderr}`, 'github');
+    return GhPrSchema.parse(JSON.parse(view.stdout));
   }
 
   async getPRForBranch(branch: string): Promise<GhPr | null> {

@@ -74,6 +74,11 @@ export async function getDefaultBranch(): Promise<string> {
   return mainResult.exitCode === 0 ? 'main' : 'master';
 }
 
+export async function pushBranch(branch: string): Promise<void> {
+  const result = await execa('git', ['push', '-u', 'origin', branch], { reject: false });
+  if (result.exitCode !== 0) throw new GitError(`git push failed: ${result.stderr}`);
+}
+
 export async function branchExists(branch: string): Promise<boolean> {
   const result = await execa('git', ['rev-parse', '--verify', branch], { reject: false });
   return result.exitCode === 0;
