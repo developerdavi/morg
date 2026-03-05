@@ -7,7 +7,7 @@ import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
-import { JiraClient } from '../integrations/jira/client';
+import { getTicketsProvider } from '../utils/providers';
 
 async function runStart(
   input: string,
@@ -22,19 +22,18 @@ async function runStart(
   if (isTicketId(input)) {
     ticketId = input.trim().toUpperCase();
 
-    // Try to enrich from Jira if enabled
+    // Try to enrich from tickets provider if enabled
     try {
       const [globalConfig, projectConfig] = await Promise.all([
         configManager.getGlobalConfig(),
         configManager.getProjectConfig(projectId),
       ]);
-      if (globalConfig.integrations.jira?.enabled && projectConfig.integrations.jira?.enabled) {
-        const jira = new JiraClient(
-          globalConfig.integrations.jira,
-          projectConfig.integrations.jira,
+      const provider = getTicketsProvider(globalConfig, projectConfig);
+      if (provider) {
+        const ticket = await withSpinner(`Fetching ${ticketId}...`, () =>
+          provider.getTicket(ticketId!),
         );
-        const issue = await withSpinner(`Fetching ${ticketId}...`, () => jira.getIssue(ticketId!));
-        ticketTitle = issue.fields.summary;
+        ticketTitle = ticket.title;
         branchName = ticketId.toLowerCase();
         console.log(theme.muted(`  ${symbols.arrow} ${ticketTitle}`));
       } else {

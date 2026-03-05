@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { JiraGlobalConfig, JiraProjectConfig } from '../../config/schemas';
 import { IntegrationError } from '../../utils/errors';
+import type { Ticket, TicketsProvider } from '../providers/types';
 
 const JiraIssueSchema = z.object({
   id: z.string(),
@@ -23,10 +24,10 @@ const JiraIssueSchema = z.object({
 
 export type JiraIssue = z.infer<typeof JiraIssueSchema>;
 
-export class JiraClient {
+export class JiraClient implements TicketsProvider {
   constructor(
     private readonly config: JiraGlobalConfig,
-    private readonly _projectConfig?: JiraProjectConfig,
+    private readonly projectConfig?: JiraProjectConfig,
   ) {}
 
   private get headers(): Record<string, string> {
@@ -55,6 +56,52 @@ export class JiraClient {
     }
     const data = await res.json();
     return JiraIssueSchema.parse(data);
+  }
+
+  async getTicket(ticketId: string): Promise<Ticket> {
+    const issue = await this.getIssue(ticketId);
+    return {
+      id: issue.key,
+      key: issue.key,
+      title: issue.fields.summary,
+      status: issue.fields.status.name,
+      url: `${this.config.baseUrl}/browse/${issue.key}`,
+      assignee: issue.fields.assignee
+        ? { name: issue.fields.assignee.displayName, email: issue.fields.assignee.emailAddress }
+        : null,
+    };
+  }
+
+  async listTickets(opts?: { status?: string }): Promise<Ticket[]> {
+    const projectKey = this.projectConfig?.projectKey;
+    const jql = [
+      projectKey ? `project="${projectKey}"` : null,
+      opts?.status ? `status="${opts.status}"` : null,
+    ]
+      .filter(Boolean)
+      .join(' AND ');
+    const res = await fetch(this.url(`/search?jql=${encodeURIComponent(jql)}&maxResults=50`), {
+      headers: this.headers,
+    });
+    if (!res.ok) throw new IntegrationError('Failed to list Jira issues', 'jira');
+    const data = (await res.json()) as { issues: unknown[] };
+    return data.issues.map((raw) => {
+      const issue = JiraIssueSchema.parse(raw);
+      return {
+        id: issue.key,
+        key: issue.key,
+        title: issue.fields.summary,
+        status: issue.fields.status.name,
+        url: `${this.config.baseUrl}/browse/${issue.key}`,
+        assignee: issue.fields.assignee
+          ? { name: issue.fields.assignee.displayName, email: issue.fields.assignee.emailAddress }
+          : null,
+      };
+    });
+  }
+
+  async transitionTicket(ticketId: string, transitionName: string): Promise<void> {
+    return this.transitionIssue(ticketId, transitionName);
   }
 
   async transitionIssue(ticketId: string, transitionName: string): Promise<void> {
