@@ -25,46 +25,59 @@ async function hasDiverged(branch: string, defaultBranch: string): Promise<boole
   return result.stdout.trim().length > 0;
 }
 
-async function runSync(): Promise<void> {
+async function runSync(options: { all?: boolean }): Promise<void> {
   const projectId = await requireTrackedRepo();
   const [globalConfig, projectConfig] = await Promise.all([
     configManager.getGlobalConfig(),
     configManager.getProjectConfig(projectId),
   ]);
   const { defaultBranch } = projectConfig;
-
-  // Project-level overrides global; fall back to global default
-  const syncPull = projectConfig.syncPull ?? globalConfig.syncPull;
   const autoDeleteMerged = projectConfig.autoDeleteMerged ?? globalConfig.autoDeleteMerged;
   const autoUpdateTicketStatus =
     projectConfig.autoUpdateTicketStatus ?? globalConfig.autoUpdateTicketStatus;
 
-  // ── Step 1: Pull default branch ──────────────────────────────────────────────
-  let shouldPull = false;
-  if (syncPull === 'always') {
-    shouldPull = true;
-  } else if (syncPull === 'ask') {
-    shouldPull = await confirm({ message: `Pull latest ${defaultBranch}?` });
+  // ── Step 1: Always pull default branch ───────────────────────────────────────
+  const startBranch = await getCurrentBranch();
+  if (startBranch !== defaultBranch) {
+    await checkout(defaultBranch);
   }
-  // 'never' → shouldPull stays false
-
-  if (shouldPull) {
-    const currentBranch = await getCurrentBranch();
-    if (currentBranch !== defaultBranch) {
-      await checkout(defaultBranch);
-    }
-    await withSpinner(`Pulling ${defaultBranch}...`, () => pullBranch(defaultBranch));
-    if (currentBranch !== defaultBranch) {
-      await checkout(currentBranch);
-    }
-    console.log(theme.success(`  ${symbols.success} Pulled latest ${defaultBranch}`));
+  await withSpinner(`Pulling ${defaultBranch}...`, () => pullBranch(defaultBranch));
+  if (startBranch !== defaultBranch) {
+    await checkout(startBranch);
   }
+  console.log(theme.success(`  ${symbols.success} Pulled latest ${defaultBranch}`));
 
-  // ── Step 2: Load branches ────────────────────────────────────────────────────
+  // ── Step 2: Sync PR statuses (all tracked branches) ──────────────────────────
   const branchesFile = await configManager.getBranches(projectId);
   const allBranches = branchesFile.branches;
+  const syncableBranches = allBranches.filter((b) => ['active', 'pr_open'].includes(b.status));
 
-  // ── Step 3: Offer to clean up merged branches ────────────────────────────────
+  let updated = 0;
+  for (const branch of syncableBranches) {
+    const pr = await withSpinner(`Checking ${branch.branchName}...`, () =>
+      ghClient.getPRForBranch(branch.branchName),
+    );
+    if (!pr) continue;
+
+    const prStatus = ghPrToPrStatus(pr);
+    const branchStatus = pr.mergedAt ? ('pr_merged' as const) : ('pr_open' as const);
+
+    if (branch.prStatus !== prStatus || branch.status !== branchStatus) {
+      branch.prNumber = pr.number;
+      branch.prUrl = pr.url;
+      branch.prStatus = prStatus;
+      branch.status = branchStatus;
+      branch.updatedAt = new Date().toISOString();
+      updated++;
+      console.log(theme.success(`  ${symbols.success} ${branch.branchName} → ${prStatus}`));
+    }
+  }
+
+  if (updated > 0) {
+    console.log(theme.success(`  Synced ${updated} PR status(es).`));
+  }
+
+  // ── Step 3: Delete merged branches (all tracked branches) ────────────────────
   const mergedBranches = allBranches.filter((b) => b.status === 'pr_merged');
   for (const branch of mergedBranches) {
     let doDelete = false;
@@ -81,7 +94,6 @@ async function runSync(): Promise<void> {
         initialValue: true,
       });
     }
-    // 'never' → doDelete stays false
     if (doDelete) {
       const currentBranch = await getCurrentBranch();
       if (currentBranch === branch.branchName) {
@@ -103,9 +115,15 @@ async function runSync(): Promise<void> {
     }
   }
 
-  // ── Step 4: Offer rebase/merge for active branches that have diverged ────────
+  // ── Step 4: Update branches with new changes from default branch ──────────────
+  // Scope: current branch only by default; all active branches if --all
+  const currentBranch = await getCurrentBranch();
   const activeBranches = allBranches.filter((b) => ['active', 'pr_open'].includes(b.status));
-  for (const branch of activeBranches) {
+  const branchesToUpdate = options.all
+    ? activeBranches
+    : activeBranches.filter((b) => b.branchName === currentBranch);
+
+  for (const branch of branchesToUpdate) {
     const diverged = await hasDiverged(branch.branchName, defaultBranch);
     if (!diverged) continue;
 
@@ -120,7 +138,6 @@ async function runSync(): Promise<void> {
 
     if (action === 'skip') continue;
 
-    const currentBranch = await getCurrentBranch();
     if (currentBranch !== branch.branchName) {
       await checkout(branch.branchName);
     }
@@ -150,45 +167,17 @@ async function runSync(): Promise<void> {
     }
   }
 
-  // ── Step 5: Sync PR statuses with GitHub ────────────────────────────────────
-  const syncableBranches = allBranches.filter((b) => ['active', 'pr_open'].includes(b.status));
-
-  if (syncableBranches.length === 0) {
-    await configManager.saveBranches(projectId, branchesFile);
-    console.log(theme.muted('No active branches to sync with GitHub.'));
-    return;
-  }
-
-  let updated = 0;
-  for (const branch of syncableBranches) {
-    const pr = await withSpinner(`Checking ${branch.branchName}...`, () =>
-      ghClient.getPRForBranch(branch.branchName),
-    );
-    if (!pr) continue;
-
-    const prStatus = ghPrToPrStatus(pr);
-    const branchStatus = pr.mergedAt ? ('pr_merged' as const) : ('pr_open' as const);
-
-    if (branch.prStatus !== prStatus || branch.status !== branchStatus) {
-      branch.prNumber = pr.number;
-      branch.prUrl = pr.url;
-      branch.prStatus = prStatus;
-      branch.status = branchStatus;
-      branch.updatedAt = new Date().toISOString();
-      updated++;
-      console.log(theme.success(`  ${symbols.success} ${branch.branchName} → ${prStatus}`));
-    }
-  }
-
   await configManager.saveBranches(projectId, branchesFile);
 
-  if (updated > 0) {
-    console.log(theme.success(`\nSynced ${updated} branch(es).`));
-  } else {
-    console.log(theme.muted('All branches up to date.'));
+  if (activeBranches.length === 0 && mergedBranches.length === 0) {
+    console.log(theme.muted('No branches to sync.'));
   }
 }
 
 export function registerSyncCommand(program: Command): void {
-  program.command('sync').description('Sync branch statuses with GitHub PRs').action(runSync);
+  program
+    .command('sync')
+    .description('Sync branch statuses with GitHub PRs and update branches')
+    .option('--all', 'Update all active branches (default: current branch only)')
+    .action(runSync);
 }
