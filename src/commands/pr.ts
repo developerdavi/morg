@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
+import { execa } from 'execa';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, getDefaultBranch, getDiffWithBase } from '../git/index';
+import { getCurrentBranch, getDefaultBranch, getDiffWithBase, pushBranch } from '../git/index';
 import { ghClient, ghPrToPrStatus } from '../integrations/github/client';
 import { ClaudeClient } from '../integrations/claude/client';
 import { prDescriptionPrompt, SYSTEM_PR_DESCRIPTION, prReviewPrompt, SYSTEM_PR_REVIEW } from '../integrations/claude/prompts';
@@ -12,8 +13,7 @@ import { intro, outro, text } from '../ui/prompts';
 async function runPrCreate(options: { ai: boolean; draft?: boolean }): Promise<void> {
   const projectId = await requireTrackedRepo();
 
-  const [projectConfig, currentBranch, defaultBranch] = await Promise.all([
-    configManager.getProjectConfig(projectId),
+  const [currentBranch, defaultBranch] = await Promise.all([
     getCurrentBranch(),
     getDefaultBranch(),
   ]);
@@ -55,6 +55,15 @@ async function runPrCreate(options: { ai: boolean; draft?: boolean }): Promise<v
       console.log(theme.warning('Could not generate AI description — creating with empty body.'));
     }
   }
+
+  const remoteHasBase = (await execa('git', ['ls-remote', '--exit-code', 'origin', defaultBranch], { reject: false })).exitCode === 0;
+  if (!remoteHasBase) {
+    console.error(theme.error(`Base branch "${defaultBranch}" has not been pushed to GitHub.`));
+    console.error(theme.muted(`Fix: git push -u origin ${defaultBranch}`));
+    process.exit(1);
+  }
+
+  await withSpinner(`Pushing ${currentBranch}...`, () => pushBranch(currentBranch));
 
   const pr = await withSpinner('Creating PR...', () =>
     ghClient.createPR({ title, body, base: defaultBranch, draft: options.draft }),
