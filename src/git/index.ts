@@ -57,6 +57,18 @@ export async function getRecentCommits(n = 10): Promise<string[]> {
   return result.stdout.split('\n').filter(Boolean);
 }
 
+/** Returns commit subject lines for commits on HEAD that are not in baseBranch. */
+export async function getCommitsOnBranch(baseBranch: string): Promise<string[]> {
+  // Prefer the remote-tracking ref to avoid failures when a local branch doesn't exist
+  for (const ref of [`origin/${baseBranch}`, baseBranch]) {
+    const result = await execa('git', ['log', `${ref}..HEAD`, '--no-merges', '--format=%s'], { reject: false });
+    if (result.exitCode === 0) {
+      return result.stdout.split('\n').filter(Boolean);
+    }
+  }
+  return [];
+}
+
 export async function getRemote(): Promise<string | null> {
   const result = await execa('git', ['remote', 'get-url', 'origin'], { reject: false });
   if (result.exitCode !== 0) return null;
