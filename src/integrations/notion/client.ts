@@ -92,6 +92,21 @@ export class NotionClient implements TicketsProvider {
     return pages.map((p) => this.mapPage(p));
   }
 
+  async getStatuses(): Promise<string[]> {
+    const res = await fetch(`${BASE_URL}/databases/${this.projectConfig.databaseId}`, {
+      headers: this.headers,
+    });
+    if (!res.ok) return [];
+    const db = (await res.json()) as {
+      properties: Record<string, { type: string; status?: { options: { name: string }[] } }>;
+    };
+    const prop = db.properties[this.projectConfig.statusProperty];
+    if (prop?.type === 'status' && Array.isArray(prop.status?.options)) {
+      return prop.status!.options.map((o) => o.name);
+    }
+    return [];
+  }
+
   async transitionTicket(ticketId: string, transitionName: string): Promise<void> {
     const ticket = await this.getTicket(ticketId);
     const res = await fetch(`${BASE_URL}/pages/${ticket.id}`, {

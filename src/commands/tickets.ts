@@ -10,7 +10,7 @@ import { withSpinner } from '../ui/spinner';
 import { select, text } from '../ui/prompts';
 import { getTicketsProvider } from '../utils/providers';
 import { IntegrationError } from '../utils/errors';
-import type { Ticket } from '../integrations/providers/types';
+import type { Ticket, TicketsProvider } from '../integrations/providers/types';
 
 function renderTicketDetail(ticket: Ticket): void {
   const lines: string[] = [
@@ -39,7 +39,11 @@ function renderTicketDetail(ticket: Ticket): void {
   );
 }
 
-async function runTicketActions(ticket: Ticket, projectId: string): Promise<void> {
+async function runTicketActions(
+  ticket: Ticket,
+  projectId: string,
+  provider: TicketsProvider,
+): Promise<void> {
   type Action = 'start' | 'status' | 'browser' | 'copy' | 'done';
 
   const options: { value: Action; label: string; hint?: string }[] = [
@@ -93,16 +97,17 @@ async function runTicketActions(ticket: Ticket, projectId: string): Promise<void
   }
 
   if (action === 'status') {
-    const [globalConfig, projectConfig] = await Promise.all([
-      configManager.getGlobalConfig(),
-      configManager.getProjectConfig(projectId),
-    ]);
-    const provider = getTicketsProvider(globalConfig, projectConfig);
-    if (!provider) {
-      console.error(theme.error('No tickets provider configured.'));
-      return;
+    const statuses = await provider.getStatuses?.();
+    let newStatus: string;
+    if (statuses && statuses.length > 0) {
+      newStatus = await select({
+        message: 'New status:',
+        options: statuses.map((s) => ({ value: s, label: s })),
+        initialValue: ticket.status,
+      });
+    } else {
+      newStatus = await text({ message: 'New status:', initialValue: ticket.status });
     }
-    const newStatus = await text({ message: 'New status:', initialValue: ticket.status });
     await withSpinner(`Updating status to "${newStatus}"...`, () =>
       provider.transitionTicket(ticket.key, newStatus),
     );
@@ -170,7 +175,7 @@ async function runTickets(
     );
     renderTicketDetail(ticket);
     if (!plain) {
-      await runTicketActions(ticket, projectId);
+      await runTicketActions(ticket, projectId, provider);
     }
     return;
   }
@@ -182,35 +187,34 @@ async function runTickets(
     return;
   }
 
-  const table = new Table({
-    head: [theme.primaryBold('Key'), theme.primaryBold('Title'), theme.primaryBold('Status')],
-    style: { head: [], border: [] },
-    colWidths: [14, 60, 20],
-    wordWrap: true,
-  });
-
-  for (const t of tickets) {
-    table.push([theme.primary(t.key), t.title, theme.muted(t.status)]);
+  if (plain) {
+    const table = new Table({
+      head: [theme.primaryBold('Key'), theme.primaryBold('Title'), theme.primaryBold('Status')],
+      style: { head: [], border: [] },
+      colWidths: [14, 60, 20],
+      wordWrap: true,
+    });
+    for (const t of tickets) {
+      table.push([theme.primary(t.key), t.title, theme.muted(t.status)]);
+    }
+    console.log('');
+    console.log(table.toString());
+    return;
   }
 
-  console.log('');
-  console.log(table.toString());
-
-  if (plain) return;
-
-  // Interactive selection
+  // Interactive selection — label always shows key + title, hint shows status
   const chosen = await select({
     message: 'Select a ticket',
     options: tickets.map((t) => ({
       value: t.key,
-      label: t.key,
-      hint: `${t.title} · ${t.status}`,
+      label: `${t.key.padEnd(12)}${t.title}`,
+      hint: t.status,
     })),
   });
 
   const ticket = await withSpinner(`Fetching ${chosen}...`, () => provider.getTicket(chosen));
   renderTicketDetail(ticket);
-  await runTicketActions(ticket, projectId);
+  await runTicketActions(ticket, projectId, provider);
 }
 
 export function registerTicketsCommand(program: Command): void {
