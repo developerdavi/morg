@@ -8,6 +8,7 @@ import {
   removeWorktree,
 } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
+import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { confirm } from '../ui/prompts';
@@ -19,12 +20,14 @@ async function runComplete(
 ): Promise<void> {
   const projectId = await requireTrackedRepo();
 
-  const targetBranch = branch ?? (await getCurrentBranch());
+  const inputBranch = branch ?? (await getCurrentBranch());
   const branches = await configManager.getBranches(projectId);
-  const trackedBranch = branches.branches.find((b) => b.branchName === targetBranch);
+  const trackedBranch = findBranchCaseInsensitive(branches.branches, inputBranch);
+  // Use the stored branchName (which preserves original casing) for all git operations
+  const targetBranch = trackedBranch?.branchName ?? inputBranch;
 
   if (!trackedBranch) {
-    console.error(theme.error(`No tracked branch found for "${targetBranch}".`));
+    console.error(theme.error(`No tracked branch found for "${inputBranch}".`));
     process.exit(1);
   }
 

@@ -23,3 +23,16 @@ export function branchNameFromTicket(ticketId: string, title?: string): string {
     .replace(/-+$/, '');
   return `feat/${id}-${slug}`;
 }
+
+/**
+ * Find a branch entry by name using case-insensitive comparison.
+ * Returns the stored branch entry (preserving its original branchName casing)
+ * or undefined if not found.
+ */
+export function findBranchCaseInsensitive<T extends { branchName: string }>(
+  branches: T[],
+  input: string,
+): T | undefined {
+  const lower = input.toLowerCase();
+  return branches.find((b) => b.branchName.toLowerCase() === lower);
+}

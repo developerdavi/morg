@@ -11,6 +11,7 @@ import {
   SYSTEM_PR_REVIEW,
 } from '../integrations/claude/prompts';
 import { requireTrackedRepo } from '../utils/detect';
+import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { intro, outro, text } from '../ui/prompts';
@@ -34,7 +35,7 @@ async function runPrCreate(options: {
     configManager.getBranches(projectId),
     getCommitsOnBranch(defaultBranch),
   ]);
-  const trackedBranch = branchesFile.branches.find((b) => b.branchName === currentBranch);
+  const trackedBranch = findBranchCaseInsensitive(branchesFile.branches, currentBranch);
 
   let defaultTitle: string;
   if (commits.length === 1 && commits[0]) {

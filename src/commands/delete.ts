@@ -3,6 +3,7 @@ import { execa } from 'execa';
 import { configManager } from '../config/manager';
 import { getCurrentBranch, checkout, removeWorktree } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
+import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { confirm } from '../ui/prompts';
@@ -18,10 +19,19 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
   const projectId = await requireTrackedRepo();
 
   const currentBranch = await getCurrentBranch();
-  const targetBranch = branch ?? currentBranch;
 
   const projectConfig = await configManager.getProjectConfig(projectId);
   const defaultBranch = projectConfig.defaultBranch;
+
+  // Resolve target branch with case-insensitive lookup when a branch arg is provided
+  let targetBranch: string;
+  if (branch) {
+    const branches = await configManager.getBranches(projectId);
+    const found = findBranchCaseInsensitive(branches.branches, branch);
+    targetBranch = found?.branchName ?? branch;
+  } else {
+    targetBranch = currentBranch;
+  }
 
   if (targetBranch === defaultBranch) {
     console.error(theme.error(`Cannot delete the default branch "${defaultBranch}".`));
@@ -29,7 +39,7 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
   }
 
   const branches = await configManager.getBranches(projectId);
-  const trackedBranch = branches.branches.find((b) => b.branchName === targetBranch);
+  const trackedBranch = findBranchCaseInsensitive(branches.branches, targetBranch);
 
   if (!options.force && (await hasUnmergedCommits(targetBranch, defaultBranch))) {
     console.error(theme.error(`Branch "${targetBranch}" has unmerged commits.`));

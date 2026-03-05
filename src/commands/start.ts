@@ -10,7 +10,7 @@ import {
   pullBranch,
   fetchAndUpdateBranch,
 } from '../git/index';
-import { isTicketId, extractTicketId } from '../utils/ticket';
+import { isTicketId, extractTicketId, findBranchCaseInsensitive } from '../utils/ticket';
 import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
@@ -29,7 +29,8 @@ export async function runStart(
 
   if (isTicketId(input)) {
     ticketId = input.trim().toUpperCase();
-    branchName = ticketId.toLowerCase();
+    // Preserve the ticket ID's original case as the branch name (e.g. MORG-28 → branch MORG-28)
+    branchName = ticketId;
 
     // Enrich from tickets provider if available — non-fatal if not configured or fetch fails
     try {
@@ -114,10 +115,10 @@ export async function runStart(
     await promptTicketInProgress(projectId, ticketId, autoUpdateTicketStatus);
   }
 
-  // Create branch entry if it doesn't exist
+  // Create branch entry if it doesn't exist (case-insensitive check to avoid duplicates)
   const now = new Date().toISOString();
   const branches = await configManager.getBranches(projectId);
-  const existing = branches.branches.find((b) => b.branchName === branchName);
+  const existing = findBranchCaseInsensitive(branches.branches, branchName);
   if (!existing) {
     branches.branches.push({
       id: `branch_${Date.now()}`,

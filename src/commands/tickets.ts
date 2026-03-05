@@ -5,6 +5,7 @@ import { execa } from 'execa';
 import { configManager } from '../config/manager';
 import { getCurrentBranch } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
+import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { select, text } from '../ui/prompts';
@@ -47,7 +48,7 @@ async function runTicketActions(
   type Action = 'start' | 'status' | 'browser' | 'copy' | 'done';
 
   const options: { value: Action; label: string; hint?: string }[] = [
-    { value: 'start', label: 'Start branch', hint: `checkout ${ticket.key.toLowerCase()}` },
+    { value: 'start', label: 'Start branch', hint: `checkout ${ticket.key}` },
     { value: 'status', label: 'Change status', hint: ticket.status },
     ...(ticket.url ? [{ value: 'browser' as Action, label: 'Open in browser' }] : []),
     ...(ticket.url ? [{ value: 'copy' as Action, label: 'Copy URL' }] : []),
@@ -118,7 +119,7 @@ async function runTickets(
       configManager.getBranches(projectId),
       getCurrentBranch(),
     ]);
-    const branch = branchesFile.branches.find((b) => b.branchName === currentBranch);
+    const branch = findBranchCaseInsensitive(branchesFile.branches, currentBranch);
     resolvedId = branch?.ticketId ?? undefined;
   }
 
