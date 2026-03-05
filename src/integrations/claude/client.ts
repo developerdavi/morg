@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { AIProvider } from '../providers/types';
 
-export class ClaudeClient {
+export class ClaudeClient implements AIProvider {
   private readonly client: Anthropic;
   private readonly model = 'claude-sonnet-4-6';
 
