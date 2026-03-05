@@ -34,8 +34,10 @@ export async function stashPop(): Promise<void> {
   if (result.exitCode !== 0) throw new GitError(`Stash pop failed: ${result.stderr}`);
 }
 
-export async function checkout(branch: string, create = false): Promise<void> {
-  const args = create ? ['checkout', '-b', branch] : ['checkout', branch];
+export async function checkout(branch: string, create = false, base?: string): Promise<void> {
+  const args = create
+    ? base ? ['checkout', '-b', branch, base] : ['checkout', '-b', branch]
+    : ['checkout', branch];
   const result = await execa('git', args, { reject: false });
   if (result.exitCode !== 0) throw new GitError(`Checkout failed: ${result.stderr}`);
 }

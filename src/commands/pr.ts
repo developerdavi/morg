@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { execa } from 'execa';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, getDefaultBranch, getDiffWithBase, pushBranch, getCommitsOnBranch } from '../git/index';
+import { getCurrentBranch, getDiffWithBase, pushBranch, getCommitsOnBranch } from '../git/index';
 import { ghClient, ghPrToPrStatus } from '../integrations/github/client';
 import { ClaudeClient } from '../integrations/claude/client';
 import { prDescriptionPrompt, SYSTEM_PR_DESCRIPTION, prReviewPrompt, SYSTEM_PR_REVIEW } from '../integrations/claude/prompts';
@@ -13,10 +13,11 @@ import { intro, outro, text } from '../ui/prompts';
 async function runPrCreate(options: { ai: boolean; draft?: boolean; yes?: boolean; title?: string; body?: string }): Promise<void> {
   const projectId = await requireTrackedRepo();
 
-  const [currentBranch, defaultBranch] = await Promise.all([
+  const [currentBranch, projectConfig] = await Promise.all([
     getCurrentBranch(),
-    getDefaultBranch(),
+    configManager.getProjectConfig(projectId),
   ]);
+  const defaultBranch = projectConfig.defaultBranch;
 
   const [tasks, commits] = await Promise.all([
     configManager.getTasks(projectId),

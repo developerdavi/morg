@@ -77,6 +77,7 @@ export const ProjectConfigSchema = z.object({
   projectId: z.string().min(1),
   githubUsername: z.string().min(1),
   githubRepo: z.string().min(1),
+  defaultBranch: z.string().min(1).default('main'),
   integrations: ProjectIntegrationsSchema.default({}),
 });
 
