@@ -3,7 +3,7 @@ import boxen from 'boxen';
 import Table from 'cli-table3';
 import { execa } from 'execa';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, checkout, branchExists } from '../git/index';
+import { getCurrentBranch } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
@@ -11,6 +11,7 @@ import { select, text } from '../ui/prompts';
 import { getTicketsProvider } from '../utils/providers';
 import { IntegrationError } from '../utils/errors';
 import type { Ticket, TicketsProvider } from '../integrations/providers/types';
+import { runStart } from './start';
 
 function renderTicketDetail(ticket: Ticket): void {
   const lines: string[] = [
@@ -59,40 +60,7 @@ async function runTicketActions(
   if (action === 'done') return;
 
   if (action === 'start') {
-    const branchName = ticket.key.toLowerCase();
-    const projectConfig = await configManager.getProjectConfig(projectId);
-    const base = projectConfig.defaultBranch;
-    const exists = await branchExists(branchName);
-    if (exists) {
-      await withSpinner(`Switching to ${branchName}...`, () => checkout(branchName));
-    } else {
-      await withSpinner(`Creating branch ${branchName} from ${base}...`, () =>
-        checkout(branchName, true, base),
-      );
-    }
-    const now = new Date().toISOString();
-    const branches = await configManager.getBranches(projectId);
-    const existing = branches.branches.find((b) => b.branchName === branchName);
-    if (!existing) {
-      branches.branches.push({
-        id: `branch_${Date.now()}`,
-        branchName,
-        ticketId: ticket.key,
-        ticketTitle: ticket.title,
-        status: 'active',
-        createdAt: now,
-        updatedAt: now,
-        prNumber: null,
-        prUrl: null,
-        prStatus: null,
-        worktreePath: null,
-        lastAccessedAt: now,
-      });
-    } else {
-      existing.lastAccessedAt = now;
-    }
-    await configManager.saveBranches(projectId, branches);
-    console.log(theme.success(`\n${symbols.success} On branch ${theme.primaryBold(branchName)}`));
+    await runStart(ticket.key, {});
     return;
   }
 

@@ -17,7 +17,7 @@ import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { fetchTicket, promptTicketInProgress } from '../utils/providers';
 
-async function runStart(
+export async function runStart(
   input: string,
   options: { base?: string; worktree?: boolean },
 ): Promise<void> {
