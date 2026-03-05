@@ -137,6 +137,16 @@ export async function pullBranch(branch: string): Promise<void> {
   if (result.exitCode !== 0) throw new GitError(`git pull failed: ${result.stderr}`);
 }
 
+/**
+ * Fast-forward a local branch from origin without checking it out.
+ * Only works when NOT currently on that branch.
+ * Returns true on success, false if the branch can't be fast-forwarded or has no remote.
+ */
+export async function fetchAndUpdateBranch(branch: string): Promise<boolean> {
+  const result = await execa('git', ['fetch', 'origin', `${branch}:${branch}`], { reject: false });
+  return result.exitCode === 0;
+}
+
 export async function rebaseBranch(onto: string): Promise<void> {
   const result = await execa('git', ['rebase', onto], { reject: false });
   if (result.exitCode !== 0) throw new GitError(`git rebase failed: ${result.stderr}`);

@@ -1,7 +1,15 @@
 import type { Command } from 'commander';
 import { join, basename } from 'path';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, checkout, branchExists, getRepoRoot, addWorktree } from '../git/index';
+import {
+  getCurrentBranch,
+  checkout,
+  branchExists,
+  getRepoRoot,
+  addWorktree,
+  pullBranch,
+  fetchAndUpdateBranch,
+} from '../git/index';
 import { isTicketId, extractTicketId } from '../utils/ticket';
 import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
@@ -42,6 +50,7 @@ async function runStart(
   const base = options.base ?? projectConfig.defaultBranch;
 
   let worktreePath: string | null = null;
+  const exists = await branchExists(branchName);
 
   if (options.worktree) {
     const repoRoot = await getRepoRoot();
@@ -49,12 +58,24 @@ async function runStart(
     const branchSlug = branchName.replace(/\//g, '-');
     worktreePath = join(repoRoot, '..', `${repoName}-worktrees`, branchSlug);
 
-    const exists = await branchExists(branchName);
     if (exists) {
       await withSpinner(`Creating worktree for ${branchName}...`, () =>
         addWorktree(worktreePath!, branchName),
       );
     } else {
+      // Update local base before creating the worktree from it
+      if (currentBranch === base) {
+        try {
+          await withSpinner(`Pulling ${base}...`, () => pullBranch(base));
+        } catch {
+          console.log(theme.warning(`  ${symbols.warning} Could not pull ${base} — using local`));
+        }
+      } else {
+        const updated = await fetchAndUpdateBranch(base);
+        if (!updated) {
+          console.log(theme.warning(`  ${symbols.warning} Could not update ${base} — using local`));
+        }
+      }
       await withSpinner(`Creating branch ${branchName} and worktree...`, () =>
         addWorktree(worktreePath!, branchName, base),
       );
@@ -64,17 +85,23 @@ async function runStart(
     );
     console.log(theme.muted(`  ${symbols.arrow} cd ${worktreePath}`));
   } else {
-    if (currentBranch !== base) {
-      await handleDirtyTree(currentBranch, branchName);
-    }
-
-    const exists = await branchExists(branchName);
     if (exists) {
-      await withSpinner(`Switching to ${branchName}...`, () => checkout(branchName));
+      if (currentBranch !== branchName) {
+        await handleDirtyTree(currentBranch, branchName);
+        await withSpinner(`Switching to ${branchName}...`, () => checkout(branchName));
+      }
     } else {
-      await withSpinner(`Creating branch ${branchName} from ${base}...`, () =>
-        checkout(branchName, true, base),
-      );
+      // Switch to base, pull it, then create the new branch from it
+      if (currentBranch !== base) {
+        await handleDirtyTree(currentBranch, branchName);
+        await withSpinner(`Switching to ${base}...`, () => checkout(base));
+      }
+      try {
+        await withSpinner(`Pulling ${base}...`, () => pullBranch(base));
+      } catch {
+        console.log(theme.warning(`  ${symbols.warning} Could not pull ${base} — using local`));
+      }
+      await withSpinner(`Creating branch ${branchName}...`, () => checkout(branchName, true));
     }
     console.log(theme.success(`\n${symbols.success} On branch ${theme.primaryBold(branchName)}`));
   }
