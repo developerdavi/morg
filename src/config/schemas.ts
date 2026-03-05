@@ -15,9 +15,15 @@ export const SlackGlobalConfigSchema = z.object({
   standupChannel: z.string().optional(),
 });
 
+export const NotionGlobalConfigSchema = z.object({
+  enabled: z.boolean(),
+  apiToken: z.string().min(1),
+});
+
 export const GlobalIntegrationsSchema = z.object({
   jira: JiraGlobalConfigSchema.optional(),
   slack: SlackGlobalConfigSchema.optional(),
+  notion: NotionGlobalConfigSchema.optional(),
 });
 
 export const GlobalConfigSchema = z.object({
@@ -32,6 +38,7 @@ export const GlobalConfigSchema = z.object({
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 export type JiraGlobalConfig = z.infer<typeof JiraGlobalConfigSchema>;
 export type SlackGlobalConfig = z.infer<typeof SlackGlobalConfigSchema>;
+export type NotionGlobalConfig = z.infer<typeof NotionGlobalConfigSchema>;
 
 // ─── Projects Registry (~/.morg/projects.json) ───────────────────────────────
 
@@ -67,9 +74,18 @@ export const GithubProjectConfigSchema = z.object({
   enabled: z.boolean(),
 });
 
+export const NotionProjectConfigSchema = z.object({
+  enabled: z.boolean(),
+  databaseId: z.string().min(1),
+  titleProperty: z.string().default('Task name'),
+  statusProperty: z.string().default('Status'),
+  idProperty: z.string().default('ID'),
+});
+
 export const ProjectIntegrationsSchema = z.object({
   github: GithubProjectConfigSchema.default({ enabled: true }),
   jira: JiraProjectConfigSchema.optional(),
+  notion: NotionProjectConfigSchema.optional(),
 });
 
 export const ProjectConfigSchema = z.object({
@@ -84,6 +100,7 @@ export const ProjectConfigSchema = z.object({
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type JiraProjectConfig = z.infer<typeof JiraProjectConfigSchema>;
+export type NotionProjectConfig = z.infer<typeof NotionProjectConfigSchema>;
 
 // ─── Branches (~/.morg/projects/[id]/branches.json) ──────────────────────────
 

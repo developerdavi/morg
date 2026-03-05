@@ -30,6 +30,10 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
       if (s.standupChannel)
         console.log(`  slack.standupChannel: ${theme.primary(s.standupChannel)}`);
     }
+    if (config.integrations.notion?.enabled) {
+      const n = config.integrations.notion;
+      console.log(`  notion.apiToken:  ${theme.muted(redact(n.apiToken))}`);
+    }
     console.log('');
     return;
   }
@@ -105,13 +109,27 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     slackConfig = { enabled: true, apiToken, standupChannel: standupChannel.trim() || undefined };
   }
 
+  const enableNotion = await confirm({
+    message: 'Enable Notion integration?',
+    initialValue: existing?.integrations.notion?.enabled ?? false,
+  });
+
+  let notionConfig: GlobalConfig['integrations']['notion'] = undefined;
+  if (enableNotion) {
+    const apiToken = await password({
+      message: 'Notion integration token (secret_...)',
+      validate: (v) => (v.trim() ? undefined : 'Required'),
+    });
+    notionConfig = { enabled: true, apiToken };
+  }
+
   await configManager.saveGlobalConfig({
     version: 1,
     githubUsername,
     anthropicApiKey,
     autoStash,
     lastStashChoice: existing?.lastStashChoice,
-    integrations: { jira: jiraConfig, slack: slackConfig },
+    integrations: { jira: jiraConfig, slack: slackConfig, notion: notionConfig },
   });
 
   outro(theme.success(`${symbols.success} Config saved to ~/.morg/config.json`));
