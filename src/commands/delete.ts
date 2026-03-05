@@ -8,7 +8,9 @@ import { withSpinner } from '../ui/spinner';
 import { confirm } from '../ui/prompts';
 
 async function hasUnmergedCommits(branch: string, defaultBranch: string): Promise<boolean> {
-  const result = await execa('git', ['log', `${defaultBranch}..${branch}`, '--oneline'], { reject: false });
+  const result = await execa('git', ['log', `${defaultBranch}..${branch}`, '--oneline'], {
+    reject: false,
+  });
   return result.exitCode === 0 && result.stdout.trim().length > 0;
 }
 

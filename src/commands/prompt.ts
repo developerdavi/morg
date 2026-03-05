@@ -23,7 +23,10 @@ morg_status() {
 }
 PS1="\\u@\\h:\\w \\$(morg_status)\\$ "`);
   } else {
-    console.error(theme.error(`Unknown shell: ${shell}`), theme.muted('Use --shell zsh or --shell bash'));
+    console.error(
+      theme.error(`Unknown shell: ${shell}`),
+      theme.muted('Use --shell zsh or --shell bash'),
+    );
     process.exit(1);
   }
 }

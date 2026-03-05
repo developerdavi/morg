@@ -9,6 +9,8 @@ pnpm build          # bundle with tsup → dist/index.js
 pnpm dev            # tsx watch (no rebuild between changes)
 pnpm dev -- start MORG-42   # run a specific command in watch mode
 pnpm typecheck      # tsc --noEmit
+pnpm lint           # eslint src
+pnpm lint --fix     # eslint src --fix (auto-fix formatting and lint errors)
 pnpm test           # vitest run (all tests)
 pnpm test:watch     # vitest (interactive)
 ```

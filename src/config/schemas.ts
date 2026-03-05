@@ -87,13 +87,7 @@ export type JiraProjectConfig = z.infer<typeof JiraProjectConfigSchema>;
 
 // ─── Tasks (~/.morg/projects/[id]/tasks.json) ────────────────────────────────
 
-export const TaskStatusSchema = z.enum([
-  'active',
-  'pr_open',
-  'pr_merged',
-  'done',
-  'abandoned',
-]);
+export const TaskStatusSchema = z.enum(['active', 'pr_open', 'pr_merged', 'done', 'abandoned']);
 
 export const PrStatusSchema = z
   .enum(['open', 'ready', 'needs_review', 'changes_requested', 'approved', 'merged', 'closed'])

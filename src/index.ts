@@ -18,10 +18,7 @@ import { registerDeleteCommand } from './commands/delete';
 
 const program = new Command();
 
-program
-  .name('morg')
-  .description('Developer productivity assistant')
-  .version('0.1.0');
+program.name('morg').description('Developer productivity assistant').version('0.1.0');
 
 program.action(() => runStatus());
 

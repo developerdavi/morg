@@ -17,11 +17,9 @@ import {
 
 async function hasDiverged(branch: string, defaultBranch: string): Promise<boolean> {
   // Count commits in defaultBranch that are not yet in branch
-  const result = await execa(
-    'git',
-    ['log', `${branch}..${defaultBranch}`, '--oneline'],
-    { reject: false },
-  );
+  const result = await execa('git', ['log', `${branch}..${defaultBranch}`, '--oneline'], {
+    reject: false,
+  });
   if (result.exitCode !== 0) return false;
   return result.stdout.trim().length > 0;
 }

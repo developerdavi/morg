@@ -36,7 +36,9 @@ export async function stashPop(): Promise<void> {
 
 export async function checkout(branch: string, create = false, base?: string): Promise<void> {
   const args = create
-    ? base ? ['checkout', '-b', branch, base] : ['checkout', '-b', branch]
+    ? base
+      ? ['checkout', '-b', branch, base]
+      : ['checkout', '-b', branch]
     : ['checkout', branch];
   const result = await execa('git', args, { reject: false });
   if (result.exitCode !== 0) throw new GitError(`Checkout failed: ${result.stderr}`);
@@ -63,7 +65,9 @@ export async function getRecentCommits(n = 10): Promise<string[]> {
 export async function getCommitsOnBranch(baseBranch: string): Promise<string[]> {
   // Prefer the remote-tracking ref to avoid failures when a local branch doesn't exist
   for (const ref of [`origin/${baseBranch}`, baseBranch]) {
-    const result = await execa('git', ['log', `${ref}..HEAD`, '--no-merges', '--format=%s'], { reject: false });
+    const result = await execa('git', ['log', `${ref}..HEAD`, '--no-merges', '--format=%s'], {
+      reject: false,
+    });
     if (result.exitCode === 0) {
       return result.stdout.split('\n').filter(Boolean);
     }
@@ -98,7 +102,11 @@ export async function branchExists(branch: string): Promise<boolean> {
   return result.exitCode === 0;
 }
 
-export async function addWorktree(worktreePath: string, branch: string, base?: string): Promise<void> {
+export async function addWorktree(
+  worktreePath: string,
+  branch: string,
+  base?: string,
+): Promise<void> {
   const args = base
     ? ['worktree', 'add', worktreePath, '-b', branch, base]
     : ['worktree', 'add', worktreePath, branch];
@@ -107,7 +115,9 @@ export async function addWorktree(worktreePath: string, branch: string, base?: s
 }
 
 export async function removeWorktree(worktreePath: string): Promise<void> {
-  const result = await execa('git', ['worktree', 'remove', '--force', worktreePath], { reject: false });
+  const result = await execa('git', ['worktree', 'remove', '--force', worktreePath], {
+    reject: false,
+  });
   if (result.exitCode !== 0) throw new GitError(`git worktree remove failed: ${result.stderr}`);
 }
 

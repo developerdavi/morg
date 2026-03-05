@@ -20,7 +20,11 @@ Based on the recent git activity and task data, generate a brief standup:
 
 Keep it to 3-5 bullet points total. Be concise.`;
 
-export function prDescriptionPrompt(diff: string, branchName: string, ticketTitle?: string): string {
+export function prDescriptionPrompt(
+  diff: string,
+  branchName: string,
+  ticketTitle?: string,
+): string {
   return `Generate a PR description for this branch: ${branchName}
 ${ticketTitle ? `Ticket: ${ticketTitle}` : ''}
 
