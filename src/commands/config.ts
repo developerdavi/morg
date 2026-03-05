@@ -129,6 +129,9 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     anthropicApiKey,
     autoStash,
     lastStashChoice: existing?.lastStashChoice,
+    syncPull: existing?.syncPull ?? 'ask',
+    autoDeleteMerged: existing?.autoDeleteMerged ?? 'ask',
+    autoUpdateTicketStatus: existing?.autoUpdateTicketStatus ?? 'ask',
     integrations: { jira: jiraConfig, slack: slackConfig, notion: notionConfig },
   });
 

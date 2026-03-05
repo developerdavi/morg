@@ -50,14 +50,19 @@ async function runComplete(
     }
   }
 
-  const projectConfig = await configManager.getProjectConfig(projectId);
+  const [globalConfig, projectConfig] = await Promise.all([
+    configManager.getGlobalConfig(),
+    configManager.getProjectConfig(projectId),
+  ]);
   const defaultBranch = projectConfig.defaultBranch;
+  const autoUpdateTicketStatus =
+    projectConfig.autoUpdateTicketStatus ?? globalConfig.autoUpdateTicketStatus;
 
   await withSpinner(`Switching to ${defaultBranch}...`, () => checkout(defaultBranch));
   await withSpinner(`Merging ${targetBranch}...`, () => mergeBranch(targetBranch));
 
   if (trackedBranch.ticketId) {
-    await promptTicketDone(projectId, trackedBranch.ticketId);
+    await promptTicketDone(projectId, trackedBranch.ticketId, autoUpdateTicketStatus);
   }
 
   const now = new Date().toISOString();

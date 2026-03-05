@@ -15,7 +15,7 @@ import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
-import { fetchTicket } from '../utils/providers';
+import { fetchTicket, promptTicketInProgress } from '../utils/providers';
 
 async function runStart(
   input: string,
@@ -43,11 +43,14 @@ async function runStart(
     ticketId = extractTicketId(input);
   }
 
-  const [currentBranch, projectConfig] = await Promise.all([
+  const [currentBranch, globalConfig, projectConfig] = await Promise.all([
     getCurrentBranch(),
+    configManager.getGlobalConfig(),
     configManager.getProjectConfig(projectId),
   ]);
   const base = options.base ?? projectConfig.defaultBranch;
+  const autoUpdateTicketStatus =
+    projectConfig.autoUpdateTicketStatus ?? globalConfig.autoUpdateTicketStatus;
 
   let worktreePath: string | null = null;
   const exists = await branchExists(branchName);
@@ -104,6 +107,11 @@ async function runStart(
       await withSpinner(`Creating branch ${branchName}...`, () => checkout(branchName, true));
     }
     console.log(theme.success(`\n${symbols.success} On branch ${theme.primaryBold(branchName)}`));
+  }
+
+  // Transition ticket to in-progress if configured
+  if (ticketId) {
+    await promptTicketInProgress(projectId, ticketId, autoUpdateTicketStatus);
   }
 
   // Create branch entry if it doesn't exist

@@ -27,8 +27,17 @@ async function hasDiverged(branch: string, defaultBranch: string): Promise<boole
 
 async function runSync(): Promise<void> {
   const projectId = await requireTrackedRepo();
-  const projectConfig = await configManager.getProjectConfig(projectId);
-  const { defaultBranch, syncPull } = projectConfig;
+  const [globalConfig, projectConfig] = await Promise.all([
+    configManager.getGlobalConfig(),
+    configManager.getProjectConfig(projectId),
+  ]);
+  const { defaultBranch } = projectConfig;
+
+  // Project-level overrides global; fall back to global default
+  const syncPull = projectConfig.syncPull ?? globalConfig.syncPull;
+  const autoDeleteMerged = projectConfig.autoDeleteMerged ?? globalConfig.autoDeleteMerged;
+  const autoUpdateTicketStatus =
+    projectConfig.autoUpdateTicketStatus ?? globalConfig.autoUpdateTicketStatus;
 
   // ── Step 1: Pull default branch ──────────────────────────────────────────────
   let shouldPull = false;
@@ -58,10 +67,21 @@ async function runSync(): Promise<void> {
   // ── Step 3: Offer to clean up merged branches ────────────────────────────────
   const mergedBranches = allBranches.filter((b) => b.status === 'pr_merged');
   for (const branch of mergedBranches) {
-    const doDelete = await confirm({
-      message: `PR for ${theme.primary(branch.branchName)} was merged. Delete local branch and mark done?`,
-      initialValue: true,
-    });
+    let doDelete = false;
+    if (autoDeleteMerged === 'always') {
+      doDelete = true;
+      console.log(
+        theme.muted(
+          `  ${symbols.arrow} PR for ${theme.primary(branch.branchName)} was merged — deleting branch`,
+        ),
+      );
+    } else if (autoDeleteMerged === 'ask') {
+      doDelete = await confirm({
+        message: `PR for ${theme.primary(branch.branchName)} was merged. Delete local branch and mark done?`,
+        initialValue: true,
+      });
+    }
+    // 'never' → doDelete stays false
     if (doDelete) {
       const currentBranch = await getCurrentBranch();
       if (currentBranch === branch.branchName) {
@@ -78,7 +98,7 @@ async function runSync(): Promise<void> {
       branch.status = 'done';
       branch.updatedAt = new Date().toISOString();
       if (branch.ticketId) {
-        await promptTicketDone(projectId, branch.ticketId);
+        await promptTicketDone(projectId, branch.ticketId, autoUpdateTicketStatus);
       }
     }
   }

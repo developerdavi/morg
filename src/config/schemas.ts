@@ -32,6 +32,9 @@ export const GlobalConfigSchema = z.object({
   anthropicApiKey: z.string().min(1).optional(),
   autoStash: z.enum(['always', 'ask', 'never']).default('ask'),
   lastStashChoice: z.enum(['stash', 'skip']).optional(),
+  syncPull: z.enum(['always', 'ask', 'never']).default('ask'),
+  autoDeleteMerged: z.enum(['always', 'ask', 'never']).default('ask'),
+  autoUpdateTicketStatus: z.enum(['always', 'ask', 'never']).default('ask'),
   integrations: GlobalIntegrationsSchema.default({}),
 });
 
@@ -94,7 +97,9 @@ export const ProjectConfigSchema = z.object({
   githubUsername: z.string().min(1),
   githubRepo: z.string().min(1),
   defaultBranch: z.string().min(1).default('main'),
-  syncPull: z.enum(['always', 'ask', 'never']).default('ask'),
+  syncPull: z.enum(['always', 'ask', 'never']).optional(),
+  autoDeleteMerged: z.enum(['always', 'ask', 'never']).optional(),
+  autoUpdateTicketStatus: z.enum(['always', 'ask', 'never']).optional(),
   integrations: ProjectIntegrationsSchema.default({}),
 });
 

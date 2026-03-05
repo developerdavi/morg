@@ -55,8 +55,17 @@ export async function fetchTicket(projectId: string, ticketId: string): Promise<
 /**
  * Prompts the user to transition a ticket to a "done" status after a branch is merged.
  * Non-fatal — silently skips if no provider is configured or the call fails.
+ *
+ * @param mode - 'always': auto-transition without prompting; 'ask': prompt the user (default);
+ *               'never': skip entirely.
  */
-export async function promptTicketDone(projectId: string, ticketId: string): Promise<void> {
+export async function promptTicketDone(
+  projectId: string,
+  ticketId: string,
+  mode: 'always' | 'ask' | 'never' = 'ask',
+): Promise<void> {
+  if (mode === 'never') return;
+
   const [globalConfig, projectConfig] = await Promise.all([
     configManager.getGlobalConfig(),
     configManager.getProjectConfig(projectId),
@@ -64,8 +73,10 @@ export async function promptTicketDone(projectId: string, ticketId: string): Pro
   const provider = getTicketsProvider(globalConfig, projectConfig);
   if (!provider) return;
 
-  const ok = await confirm({ message: `Mark ticket ${ticketId} as done?`, initialValue: true });
-  if (!ok) return;
+  if (mode === 'ask') {
+    const ok = await confirm({ message: `Mark ticket ${ticketId} as done?`, initialValue: true });
+    if (!ok) return;
+  }
 
   try {
     const statuses = await provider.getStatuses?.();
@@ -74,11 +85,17 @@ export async function promptTicketDone(projectId: string, ticketId: string): Pro
       const defaultDone =
         statuses.find((s) => /done|complete|closed|shipped|resolved/i.test(s)) ??
         statuses[statuses.length - 1]!;
-      doneStatus = await select({
-        message: 'Done status:',
-        options: statuses.map((s) => ({ value: s, label: s })),
-        initialValue: defaultDone,
-      });
+      if (mode === 'always') {
+        doneStatus = defaultDone;
+      } else {
+        doneStatus = await select({
+          message: 'Done status:',
+          options: statuses.map((s) => ({ value: s, label: s })),
+          initialValue: defaultDone,
+        });
+      }
+    } else if (mode === 'always') {
+      doneStatus = 'Done';
     } else {
       doneStatus = await text({ message: 'Done status:', initialValue: 'Done' });
     }
@@ -86,6 +103,71 @@ export async function promptTicketDone(projectId: string, ticketId: string): Pro
       provider.transitionTicket(ticketId, doneStatus),
     );
     console.log(theme.success(`  ${symbols.success} Ticket ${ticketId} marked as "${doneStatus}"`));
+  } catch {
+    console.log(
+      theme.warning(`  ${symbols.warning} Could not update ticket ${ticketId} — skipping`),
+    );
+  }
+}
+
+/**
+ * Transitions a ticket to an "in progress" status when starting a branch.
+ * Non-fatal — silently skips if no provider is configured or the call fails.
+ *
+ * @param mode - 'always': auto-transition without prompting; 'ask': prompt the user;
+ *               'never': skip entirely.
+ */
+export async function promptTicketInProgress(
+  projectId: string,
+  ticketId: string,
+  mode: 'always' | 'ask' | 'never' = 'ask',
+): Promise<void> {
+  if (mode === 'never') return;
+
+  const [globalConfig, projectConfig] = await Promise.all([
+    configManager.getGlobalConfig(),
+    configManager.getProjectConfig(projectId),
+  ]);
+  const provider = getTicketsProvider(globalConfig, projectConfig);
+  if (!provider) return;
+
+  if (mode === 'ask') {
+    const ok = await confirm({
+      message: `Mark ticket ${ticketId} as in progress?`,
+      initialValue: true,
+    });
+    if (!ok) return;
+  }
+
+  try {
+    const statuses = await provider.getStatuses?.();
+    let inProgressStatus: string;
+    if (statuses && statuses.length > 0) {
+      const defaultInProgress =
+        statuses.find((s) => /in.?progress|started|working|doing/i.test(s)) ?? statuses[0]!;
+      if (mode === 'always') {
+        inProgressStatus = defaultInProgress;
+      } else {
+        inProgressStatus = await select({
+          message: 'In progress status:',
+          options: statuses.map((s) => ({ value: s, label: s })),
+          initialValue: defaultInProgress,
+        });
+      }
+    } else if (mode === 'always') {
+      inProgressStatus = 'In Progress';
+    } else {
+      inProgressStatus = await text({
+        message: 'In progress status:',
+        initialValue: 'In Progress',
+      });
+    }
+    await withSpinner(`Marking ${ticketId} as "${inProgressStatus}"...`, () =>
+      provider.transitionTicket(ticketId, inProgressStatus),
+    );
+    console.log(
+      theme.success(`  ${symbols.success} Ticket ${ticketId} marked as "${inProgressStatus}"`),
+    );
   } catch {
     console.log(
       theme.warning(`  ${symbols.warning} Could not update ticket ${ticketId} — skipping`),
