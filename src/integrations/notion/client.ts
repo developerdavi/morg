@@ -78,14 +78,16 @@ export class NotionClient implements TicketsProvider {
   }
 
   async listTickets(opts?: { status?: string }): Promise<Ticket[]> {
-    const body: Record<string, unknown> = opts?.status
-      ? {
-          filter: {
-            property: this.projectConfig.statusProperty,
-            status: { equals: opts.status },
-          },
-        }
-      : {};
+    const body: Record<string, unknown> = {
+      sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
+      page_size: 100,
+    };
+    if (opts?.status) {
+      body.filter = {
+        property: this.projectConfig.statusProperty,
+        status: { equals: opts.status },
+      };
+    }
     const pages = await this.queryDatabase(body);
     return pages.map((p) => this.mapPage(p));
   }
