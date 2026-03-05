@@ -73,13 +73,11 @@ export async function promptTicketDone(
   const provider = getTicketsProvider(globalConfig, projectConfig);
   if (!provider) return;
 
-  if (mode === 'ask') {
-    const ok = await confirm({ message: `Mark ticket ${ticketId} as done?`, initialValue: true });
-    if (!ok) return;
-  }
-
   try {
-    const statuses = await provider.getStatuses?.();
+    const [statuses, currentTicket] = await Promise.all([
+      provider.getStatuses?.() ?? Promise.resolve(undefined),
+      provider.getTicket(ticketId),
+    ]);
     let doneStatus: string;
     if (statuses && statuses.length > 0) {
       const defaultDone =
@@ -98,6 +96,11 @@ export async function promptTicketDone(
       doneStatus = 'Done';
     } else {
       doneStatus = await text({ message: 'Done status:', initialValue: 'Done' });
+    }
+    if (currentTicket.status.toLowerCase() === doneStatus.toLowerCase()) return;
+    if (mode === 'ask') {
+      const ok = await confirm({ message: `Mark ticket ${ticketId} as done?`, initialValue: true });
+      if (!ok) return;
     }
     await withSpinner(`Marking ${ticketId} as "${doneStatus}"...`, () =>
       provider.transitionTicket(ticketId, doneStatus),
@@ -131,16 +134,11 @@ export async function promptTicketInProgress(
   const provider = getTicketsProvider(globalConfig, projectConfig);
   if (!provider) return;
 
-  if (mode === 'ask') {
-    const ok = await confirm({
-      message: `Mark ticket ${ticketId} as in progress?`,
-      initialValue: true,
-    });
-    if (!ok) return;
-  }
-
   try {
-    const statuses = await provider.getStatuses?.();
+    const [statuses, currentTicket] = await Promise.all([
+      provider.getStatuses?.() ?? Promise.resolve(undefined),
+      provider.getTicket(ticketId),
+    ]);
     let inProgressStatus: string;
     if (statuses && statuses.length > 0) {
       const defaultInProgress =
@@ -163,6 +161,14 @@ export async function promptTicketInProgress(
         message: 'In progress status:',
         initialValue: 'In Progress',
       });
+    }
+    if (currentTicket.status.toLowerCase() === inProgressStatus.toLowerCase()) return;
+    if (mode === 'ask') {
+      const ok = await confirm({
+        message: `Mark ticket ${ticketId} as in progress?`,
+        initialValue: true,
+      });
+      if (!ok) return;
     }
     await withSpinner(`Marking ${ticketId} as "${inProgressStatus}"...`, () =>
       provider.transitionTicket(ticketId, inProgressStatus),
