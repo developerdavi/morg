@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, checkout, branchExists } from '../git/index';
+import { getCurrentBranch, checkout, branchExists, getDefaultBranch } from '../git/index';
 import { isTicketId, branchNameFromTicket, extractTicketId } from '../utils/ticket';
 import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
@@ -8,7 +8,7 @@ import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { JiraClient } from '../integrations/jira/client';
 
-async function runStart(input: string): Promise<void> {
+async function runStart(input: string, options: { base?: string }): Promise<void> {
   const projectId = await requireTrackedRepo();
 
   let branchName: string;
@@ -41,13 +41,19 @@ async function runStart(input: string): Promise<void> {
     ticketId = extractTicketId(input);
   }
 
-  await handleDirtyTree(await getCurrentBranch(), branchName);
+  const [currentBranch, defaultBranch] = await Promise.all([
+    getCurrentBranch(),
+    getDefaultBranch(),
+  ]);
+  const base = options.base ?? defaultBranch;
+
+  await handleDirtyTree(currentBranch, branchName);
 
   const exists = await branchExists(branchName);
   if (exists) {
     await withSpinner(`Switching to ${branchName}...`, () => checkout(branchName));
   } else {
-    await withSpinner(`Creating branch ${branchName}...`, () => checkout(branchName, true));
+    await withSpinner(`Creating branch ${branchName} from ${base}...`, () => checkout(branchName, true, base));
   }
 
   // Create task entry if it doesn't exist
@@ -77,5 +83,6 @@ export function registerStartCommand(program: Command): void {
   program
     .command('start <branch-or-ticket>')
     .description('Start work on a branch or ticket')
+    .option('--base <branch>', 'Base branch to create from (default: repo default branch)')
     .action(runStart);
 }
