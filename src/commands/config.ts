@@ -18,7 +18,6 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     if (config.anthropicApiKey)
       console.log(`  anthropicApiKey: ${theme.muted(redact(config.anthropicApiKey))}`);
     console.log(`  autoStash:            ${theme.primary(config.autoStash)}`);
-    console.log(`  syncPull:             ${theme.primary(config.syncPull)}`);
     console.log(`  autoDeleteMerged:     ${theme.primary(config.autoDeleteMerged)}`);
     console.log(`  autoUpdateTicketStatus: ${theme.primary(config.autoUpdateTicketStatus)}`);
     if (config.integrations.jira?.enabled) {
@@ -68,16 +67,6 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
       { value: 'never', label: 'Never stash' },
     ],
     initialValue: existing?.autoStash ?? 'ask',
-  });
-
-  const syncPull = await select({
-    message: 'Pull base branch before creating a new branch?',
-    options: [
-      { value: 'ask', label: 'Ask each time' },
-      { value: 'always', label: 'Always pull automatically' },
-      { value: 'never', label: 'Never pull' },
-    ],
-    initialValue: existing?.syncPull ?? 'ask',
   });
 
   const autoDeleteMerged = await select({
@@ -177,7 +166,6 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     anthropicApiKey,
     autoStash,
     lastStashChoice: existing?.lastStashChoice,
-    syncPull,
     autoDeleteMerged,
     autoUpdateTicketStatus,
     integrations: { jira: jiraConfig, slack: slackConfig, notion: notionConfig },
