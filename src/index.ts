@@ -15,6 +15,7 @@ import { registerPromptCommand } from './commands/prompt';
 import { registerUpdateCommand } from './commands/update';
 import { registerCompleteCommand } from './commands/complete';
 import { registerDeleteCommand } from './commands/delete';
+import { registerCleanCommand } from './commands/clean';
 import { registerTicketsCommand } from './commands/tickets';
 import { registerInstallClaudeSkillCommand } from './commands/install-claude-skill';
 
@@ -43,6 +44,7 @@ registerPromptCommand(program);
 registerUpdateCommand(program);
 registerCompleteCommand(program);
 registerDeleteCommand(program);
+registerCleanCommand(program);
 registerTicketsCommand(program);
 registerInstallClaudeSkillCommand(program);
 
