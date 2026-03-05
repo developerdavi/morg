@@ -117,10 +117,14 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
       initialValue: existing?.integrations.jira?.userEmail,
       validate: (v) => (v.includes('@') ? undefined : 'Enter a valid email'),
     });
-    const apiToken = await password({
-      message: 'Jira API token',
-      validate: (v) => (v.trim() ? undefined : 'Required'),
+    const existingJiraToken = existing?.integrations.jira?.apiToken;
+    const jiraApiTokenRaw = await password({
+      message: existingJiraToken
+        ? 'Jira API token — leave blank to keep existing'
+        : 'Jira API token',
+      validate: (v) => (!v.trim() && !existingJiraToken ? 'Required' : undefined),
     });
+    const apiToken = jiraApiTokenRaw.trim() || existingJiraToken!;
     jiraConfig = { enabled: true, baseUrl, userEmail, apiToken };
   }
 
@@ -131,10 +135,17 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
 
   let slackConfig: GlobalConfig['integrations']['slack'] = undefined;
   if (enableSlack) {
-    const apiToken = await password({
-      message: 'Slack bot token (xoxb-...)',
-      validate: (v) => (v.startsWith('xoxb-') ? undefined : 'Must start with xoxb-'),
+    const existingSlackToken = existing?.integrations.slack?.apiToken;
+    const slackApiTokenRaw = await password({
+      message: existingSlackToken
+        ? 'Slack bot token (xoxb-...) — leave blank to keep existing'
+        : 'Slack bot token (xoxb-...)',
+      validate: (v) => {
+        if (!v.trim()) return existingSlackToken ? undefined : 'Required';
+        return v.startsWith('xoxb-') ? undefined : 'Must start with xoxb-';
+      },
     });
+    const apiToken = slackApiTokenRaw.trim() || existingSlackToken!;
     const standupChannel = await text({
       message: 'Standup channel ID (e.g. C01234567) — leave blank to skip',
       initialValue: existing?.integrations.slack?.standupChannel ?? '',
@@ -149,10 +160,14 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
 
   let notionConfig: GlobalConfig['integrations']['notion'] = undefined;
   if (enableNotion) {
-    const apiToken = await password({
-      message: 'Notion integration token (secret_...)',
-      validate: (v) => (v.trim() ? undefined : 'Required'),
+    const existingNotionToken = existing?.integrations.notion?.apiToken;
+    const notionApiTokenRaw = await password({
+      message: existingNotionToken
+        ? 'Notion integration token (secret_...) — leave blank to keep existing'
+        : 'Notion integration token (secret_...)',
+      validate: (v) => (!v.trim() && !existingNotionToken ? 'Required' : undefined),
     });
+    const apiToken = notionApiTokenRaw.trim() || existingNotionToken!;
     notionConfig = { enabled: true, apiToken };
   }
 

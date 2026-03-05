@@ -62,6 +62,9 @@ async function runInit(): Promise<void> {
 
   const projects = await configManager.getProjects();
   const existing = projects.projects.find((p) => p.path === repoRoot);
+  const existingProjectConfig = existing
+    ? await configManager.getProjectConfig(existing.id).catch(() => undefined)
+    : undefined;
   if (existing) {
     console.log(theme.warning(`This repo is already initialized as "${existing.id}".`));
     const reinit = await confirm({ message: 'Re-initialize?', initialValue: false });
@@ -92,6 +95,7 @@ async function runInit(): Promise<void> {
   if (jiraEnabled) {
     const raw = await text({
       message: 'Jira project key (e.g. MORG)',
+      initialValue: existingProjectConfig?.integrations.jira?.projectKey,
       validate: (v) => (/^[A-Z][A-Z0-9]+$/i.test(v.trim()) ? undefined : 'e.g. MORG'),
     });
     jiraProjectKey = raw.trim().toUpperCase();
@@ -106,6 +110,7 @@ async function runInit(): Promise<void> {
     const notionUrl = await text({
       message: 'Notion database URL (or URL of any page inside it)',
       placeholder: 'https://www.notion.so/My-Database-8a4b8c3d2e1f4a5b9c6d7e8f9a0b1c2d',
+      initialValue: existingProjectConfig?.integrations.notion?.databaseId,
       validate: (v) => {
         if (!v.trim()) return 'Required';
         if (!NOTION_ID_RE.test(v.split('?')[0] ?? v))
@@ -133,7 +138,7 @@ async function runInit(): Promise<void> {
     githubUsername: globalConfig.githubUsername,
     githubRepo,
     defaultBranch,
-    syncPull: 'ask',
+    syncPull: existingProjectConfig?.syncPull ?? 'ask',
     integrations: {
       github: { enabled: true },
       jira:
