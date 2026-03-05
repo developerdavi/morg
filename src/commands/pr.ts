@@ -4,13 +4,24 @@ import { configManager } from '../config/manager';
 import { getCurrentBranch, getDiffWithBase, pushBranch, getCommitsOnBranch } from '../git/index';
 import { ghClient, ghPrToPrStatus } from '../integrations/github/client';
 import { ClaudeClient } from '../integrations/claude/client';
-import { prDescriptionPrompt, SYSTEM_PR_DESCRIPTION, prReviewPrompt, SYSTEM_PR_REVIEW } from '../integrations/claude/prompts';
+import {
+  prDescriptionPrompt,
+  SYSTEM_PR_DESCRIPTION,
+  prReviewPrompt,
+  SYSTEM_PR_REVIEW,
+} from '../integrations/claude/prompts';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { intro, outro, text } from '../ui/prompts';
 
-async function runPrCreate(options: { ai: boolean; draft?: boolean; yes?: boolean; title?: string; body?: string }): Promise<void> {
+async function runPrCreate(options: {
+  ai: boolean;
+  draft?: boolean;
+  yes?: boolean;
+  title?: string;
+  body?: string;
+}): Promise<void> {
   const projectId = await requireTrackedRepo();
 
   const [currentBranch, projectConfig] = await Promise.all([
@@ -70,7 +81,9 @@ async function runPrCreate(options: { ai: boolean; draft?: boolean; yes?: boolea
         placeholder: 'Leave blank to skip',
       });
 
-  const remoteHasBase = (await execa('git', ['ls-remote', '--exit-code', 'origin', defaultBranch], { reject: false })).exitCode === 0;
+  const remoteHasBase =
+    (await execa('git', ['ls-remote', '--exit-code', 'origin', defaultBranch], { reject: false }))
+      .exitCode === 0;
   if (!remoteHasBase) {
     console.error(theme.error(`Base branch "${defaultBranch}" has not been pushed to GitHub.`));
     console.error(theme.muted(`Fix: git push -u origin ${defaultBranch}`));
@@ -135,7 +148,9 @@ async function runPrReview(options: { ai?: boolean }): Promise<void> {
 
 async function runPrView(options: { web?: boolean }): Promise<void> {
   const branch = await getCurrentBranch();
-  const pr = await withSpinner(`Fetching PR for ${branch}...`, () => ghClient.getPRForBranch(branch));
+  const pr = await withSpinner(`Fetching PR for ${branch}...`, () =>
+    ghClient.getPRForBranch(branch),
+  );
 
   if (!pr) {
     console.log(theme.muted(`No PR found for branch "${branch}".`));
@@ -159,7 +174,10 @@ async function runPrView(options: { web?: boolean }): Promise<void> {
 }
 
 export function registerPrCommand(program: Command): void {
-  const pr = program.command('pr').description('Pull request commands').action(() => runPrView({}));
+  const pr = program
+    .command('pr')
+    .description('Pull request commands')
+    .action(() => runPrView({}));
 
   pr.command('create')
     .description('Create a pull request for the current branch')
@@ -168,7 +186,10 @@ export function registerPrCommand(program: Command): void {
     .option('-y, --yes', 'Skip prompts and use defaults (or --title/--body values)')
     .option('--title <title>', 'PR title (skips title prompt)')
     .option('--body <body>', 'PR body/description (skips AI generation)')
-    .action((options: { ai: boolean; draft?: boolean; yes?: boolean; title?: string; body?: string }) => runPrCreate(options));
+    .action(
+      (options: { ai: boolean; draft?: boolean; yes?: boolean; title?: string; body?: string }) =>
+        runPrCreate(options),
+    );
 
   pr.command('review')
     .description('List and review open pull requests')

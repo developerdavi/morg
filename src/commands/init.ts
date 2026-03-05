@@ -85,9 +85,14 @@ async function runInit(): Promise<void> {
     syncPull: 'ask',
     integrations: {
       github: { enabled: true },
-      jira: jiraEnabled && jiraProjectKey
-        ? { enabled: true, projectKey: jiraProjectKey, defaultTransitions: { start: 'In Progress', done: 'Done' } }
-        : undefined,
+      jira:
+        jiraEnabled && jiraProjectKey
+          ? {
+              enabled: true,
+              projectKey: jiraProjectKey,
+              defaultTransitions: { start: 'In Progress', done: 'Done' },
+            }
+          : undefined,
     },
   });
 
@@ -95,8 +100,5 @@ async function runInit(): Promise<void> {
 }
 
 export function registerInitCommand(program: Command): void {
-  program
-    .command('init')
-    .description('Initialize morg for the current repository')
-    .action(runInit);
+  program.command('init').description('Initialize morg for the current repository').action(runInit);
 }

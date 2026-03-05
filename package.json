@@ -4,9 +4,15 @@
   "description": "Developer productivity assistant CLI",
   "type": "module",
   "license": "MIT",
-  "bin": { "morg": "./dist/index.js" },
-  "files": ["dist"],
-  "engines": { "node": ">=20.0.0" },
+  "bin": {
+    "morg": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsx watch src/index.ts",
@@ -32,10 +38,14 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "eslint": "^10.0.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "prettier": "^3.5.0",
     "tsup": "^8.5.0",
     "tsx": "^4.21.0",
     "typescript": "^5.8.0",
-    "vitest": "^3.0.0",
-    "prettier": "^3.5.0"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^3.0.0"
   }
 }

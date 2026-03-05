@@ -56,7 +56,9 @@ async function runSwitch(input?: string): Promise<void> {
     // Update lastAccessedAt
     task.lastAccessedAt = new Date().toISOString();
     await configManager.saveTasks(projectId, tasks);
-    console.log(theme.success(`\n${symbols.success} Worktree branch ${theme.primaryBold(branchName)}`));
+    console.log(
+      theme.success(`\n${symbols.success} Worktree branch ${theme.primaryBold(branchName)}`),
+    );
     console.log(theme.muted(`  cd ${task.worktreePath}`));
     return;
   }

@@ -9,7 +9,10 @@ import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { JiraClient } from '../integrations/jira/client';
 
-async function runStart(input: string, options: { base?: string; worktree?: boolean }): Promise<void> {
+async function runStart(
+  input: string,
+  options: { base?: string; worktree?: boolean },
+): Promise<void> {
   const projectId = await requireTrackedRepo();
 
   let branchName: string;
@@ -26,7 +29,10 @@ async function runStart(input: string, options: { base?: string; worktree?: bool
         configManager.getProjectConfig(projectId),
       ]);
       if (globalConfig.integrations.jira?.enabled && projectConfig.integrations.jira?.enabled) {
-        const jira = new JiraClient(globalConfig.integrations.jira, projectConfig.integrations.jira);
+        const jira = new JiraClient(
+          globalConfig.integrations.jira,
+          projectConfig.integrations.jira,
+        );
         const issue = await withSpinner(`Fetching ${ticketId}...`, () => jira.getIssue(ticketId!));
         ticketTitle = issue.fields.summary;
         branchName = ticketId.toLowerCase();
@@ -58,11 +64,17 @@ async function runStart(input: string, options: { base?: string; worktree?: bool
 
     const exists = await branchExists(branchName);
     if (exists) {
-      await withSpinner(`Creating worktree for ${branchName}...`, () => addWorktree(worktreePath!, branchName));
+      await withSpinner(`Creating worktree for ${branchName}...`, () =>
+        addWorktree(worktreePath!, branchName),
+      );
     } else {
-      await withSpinner(`Creating branch ${branchName} and worktree...`, () => addWorktree(worktreePath!, branchName, base));
+      await withSpinner(`Creating branch ${branchName} and worktree...`, () =>
+        addWorktree(worktreePath!, branchName, base),
+      );
     }
-    console.log(theme.success(`\n${symbols.success} Worktree created at ${theme.primaryBold(worktreePath)}`));
+    console.log(
+      theme.success(`\n${symbols.success} Worktree created at ${theme.primaryBold(worktreePath)}`),
+    );
     console.log(theme.muted(`  ${symbols.arrow} cd ${worktreePath}`));
   } else {
     if (currentBranch !== base) {
@@ -73,7 +85,9 @@ async function runStart(input: string, options: { base?: string; worktree?: bool
     if (exists) {
       await withSpinner(`Switching to ${branchName}...`, () => checkout(branchName));
     } else {
-      await withSpinner(`Creating branch ${branchName} from ${base}...`, () => checkout(branchName, true, base));
+      await withSpinner(`Creating branch ${branchName} from ${base}...`, () =>
+        checkout(branchName, true, base),
+      );
     }
     console.log(theme.success(`\n${symbols.success} On branch ${theme.primaryBold(branchName)}`));
   }

@@ -17,7 +17,9 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
       existing.ticketId = ticketId;
       existing.updatedAt = new Date().toISOString();
       await configManager.saveTasks(projectId, tasks);
-      console.log(theme.success(`${symbols.success} Updated task for ${branchName} → ticket ${ticketId}`));
+      console.log(
+        theme.success(`${symbols.success} Updated task for ${branchName} → ticket ${ticketId}`),
+      );
     } else {
       console.log(theme.muted(`Branch ${branchName} is already tracked.`));
     }

@@ -26,7 +26,10 @@ async function runStandup(options: { post?: boolean; channel?: string }): Promis
     .map((t) => `PR #${t.prNumber} (${t.prStatus ?? 'open'}) — ${t.ticketTitle ?? t.branchName}`);
 
   if (!globalConfig.anthropicApiKey) {
-    console.error(theme.error('Anthropic API key is required for standup.'), theme.muted('Run: morg config'));
+    console.error(
+      theme.error('Anthropic API key is required for standup.'),
+      theme.muted('Run: morg config'),
+    );
     process.exit(1);
   }
   const claude = new ClaudeClient(globalConfig.anthropicApiKey);
@@ -36,7 +39,12 @@ async function runStandup(options: { post?: boolean; channel?: string }): Promis
 
   console.log('\n' + theme.primaryBold('  Standup'));
   console.log(theme.muted('  ' + '─'.repeat(50)));
-  console.log(standup.split('\n').map((l) => `  ${l}`).join('\n'));
+  console.log(
+    standup
+      .split('\n')
+      .map((l) => `  ${l}`)
+      .join('\n'),
+  );
   console.log('');
 
   if (options.post) {
