@@ -9,13 +9,13 @@ import { withSpinner } from '../ui/spinner';
 import { select } from '../ui/prompts';
 
 async function pickBranch(projectId: string, currentBranch: string): Promise<string> {
-  const tasks = await configManager.getTasks(projectId);
-  const choices = tasks.tasks
-    .filter((t) => ['active', 'pr_open'].includes(t.status) && t.branchName !== currentBranch)
-    .map((t) => ({
-      value: t.branchName,
-      label: t.branchName,
-      hint: t.ticketId ? `${t.ticketId}${t.ticketTitle ? ` · ${t.ticketTitle}` : ''}` : undefined,
+  const branches = await configManager.getBranches(projectId);
+  const choices = branches.branches
+    .filter((b) => ['active', 'pr_open'].includes(b.status) && b.branchName !== currentBranch)
+    .map((b) => ({
+      value: b.branchName,
+      label: b.branchName,
+      hint: b.ticketId ? `${b.ticketId}${b.ticketTitle ? ` · ${b.ticketTitle}` : ''}` : undefined,
     }));
 
   if (choices.length === 0) {
@@ -36,30 +36,30 @@ async function runSwitch(input?: string): Promise<void> {
     branchName = await pickBranch(projectId, current);
   } else if (isTicketId(input)) {
     const ticketId = input.trim().toUpperCase();
-    const tasks = await configManager.getTasks(projectId);
-    const task = tasks.tasks.find((t) => t.ticketId === ticketId && t.status === 'active');
-    if (!task) {
-      console.error(theme.error(`No active task found for ticket ${ticketId}.`));
+    const branches = await configManager.getBranches(projectId);
+    const branch = branches.branches.find((b) => b.ticketId === ticketId && b.status === 'active');
+    if (!branch) {
+      console.error(theme.error(`No active branch found for ticket ${ticketId}.`));
       console.error(theme.muted(`Use: morg start ${ticketId}`));
       process.exit(1);
     }
-    branchName = task.branchName;
+    branchName = branch.branchName;
   } else {
     branchName = input;
   }
 
-  // Check if task has a worktree
-  const tasks = await configManager.getTasks(projectId);
-  const task = tasks.tasks.find((t) => t.branchName === branchName);
+  // Check if branch has a worktree
+  const branches = await configManager.getBranches(projectId);
+  const branch = branches.branches.find((b) => b.branchName === branchName);
 
-  if (task?.worktreePath) {
+  if (branch?.worktreePath) {
     // Update lastAccessedAt
-    task.lastAccessedAt = new Date().toISOString();
-    await configManager.saveTasks(projectId, tasks);
+    branch.lastAccessedAt = new Date().toISOString();
+    await configManager.saveBranches(projectId, branches);
     console.log(
       theme.success(`\n${symbols.success} Worktree branch ${theme.primaryBold(branchName)}`),
     );
-    console.log(theme.muted(`  cd ${task.worktreePath}`));
+    console.log(theme.muted(`  cd ${branch.worktreePath}`));
     return;
   }
 
@@ -75,9 +75,9 @@ async function runSwitch(input?: string): Promise<void> {
   }
 
   // Update lastAccessedAt
-  if (task) {
-    task.lastAccessedAt = new Date().toISOString();
-    await configManager.saveTasks(projectId, tasks);
+  if (branch) {
+    branch.lastAccessedAt = new Date().toISOString();
+    await configManager.saveBranches(projectId, branches);
   }
 
   console.log(theme.success(`\n${symbols.success} On branch ${theme.primaryBold(branchName)}`));

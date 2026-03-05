@@ -13,6 +13,6 @@ export function projectConfigFile(id: string): string {
   return join(projectDir(id), 'config.json');
 }
 
-export function projectTasksFile(id: string): string {
-  return join(projectDir(id), 'tasks.json');
+export function projectBranchesFile(id: string): string {
+  return join(projectDir(id), 'branches.json');
 }

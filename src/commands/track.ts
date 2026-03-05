@@ -9,16 +9,16 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
   const branchName = branch ?? (await getCurrentBranch());
   const ticketId = ticket?.toUpperCase() ?? null;
 
-  const tasks = await configManager.getTasks(projectId);
-  const existing = tasks.tasks.find((t) => t.branchName === branchName);
+  const branchesFile = await configManager.getBranches(projectId);
+  const existing = branchesFile.branches.find((b) => b.branchName === branchName);
 
   if (existing) {
     if (ticketId) {
       existing.ticketId = ticketId;
       existing.updatedAt = new Date().toISOString();
-      await configManager.saveTasks(projectId, tasks);
+      await configManager.saveBranches(projectId, branchesFile);
       console.log(
-        theme.success(`${symbols.success} Updated task for ${branchName} → ticket ${ticketId}`),
+        theme.success(`${symbols.success} Updated branch ${branchName} → ticket ${ticketId}`),
       );
     } else {
       console.log(theme.muted(`Branch ${branchName} is already tracked.`));
@@ -27,8 +27,8 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
   }
 
   const now = new Date().toISOString();
-  tasks.tasks.push({
-    id: `task_${Date.now()}`,
+  branchesFile.branches.push({
+    id: `branch_${Date.now()}`,
     branchName,
     ticketId,
     ticketTitle: null,
@@ -40,13 +40,13 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
     prStatus: null,
     worktreePath: null,
   });
-  await configManager.saveTasks(projectId, tasks);
+  await configManager.saveBranches(projectId, branchesFile);
   console.log(theme.success(`${symbols.success} Now tracking ${branchName}`));
 }
 
 export function registerTrackCommand(program: Command): void {
   program
     .command('track [branch] [ticket]')
-    .description('Track the current (or specified) branch as a task')
+    .description('Track the current (or specified) branch')
     .action(runTrack);
 }

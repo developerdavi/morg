@@ -1,18 +1,24 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import { z } from 'zod';
 import {
   GlobalConfigSchema,
   ProjectConfigSchema,
   ProjectsFileSchema,
-  TasksFileSchema,
+  BranchesFileSchema,
   type GlobalConfig,
   type ProjectConfig,
   type ProjectsFile,
-  type TasksFile,
+  type BranchesFile,
 } from './schemas';
-import { CONFIG_FILE, PROJECTS_FILE, projectConfigFile, projectTasksFile } from './paths';
+import {
+  CONFIG_FILE,
+  PROJECTS_FILE,
+  projectConfigFile,
+  projectBranchesFile,
+  projectDir,
+} from './paths';
 import { ConfigError } from '../utils/errors';
 
 async function readJson<S extends z.ZodTypeAny>(
@@ -74,12 +80,18 @@ class ConfigManager {
     return existsSync(projectConfigFile(id));
   }
 
-  async getTasks(id: string): Promise<TasksFile> {
-    return readJson(projectTasksFile(id), TasksFileSchema, { version: 1, tasks: [] });
+  async getBranches(id: string): Promise<BranchesFile> {
+    const newPath = projectBranchesFile(id);
+    const oldPath = join(projectDir(id), 'tasks.json');
+    if (!existsSync(newPath) && existsSync(oldPath)) {
+      const old = JSON.parse(await readFile(oldPath, 'utf-8')) as { tasks?: unknown[] };
+      await writeJson(newPath, { version: 1, branches: old.tasks ?? [] });
+    }
+    return readJson(newPath, BranchesFileSchema, { version: 1, branches: [] });
   }
 
-  async saveTasks(id: string, data: TasksFile): Promise<void> {
-    await writeJson(projectTasksFile(id), data);
+  async saveBranches(id: string, data: BranchesFile): Promise<void> {
+    await writeJson(projectBranchesFile(id), data);
   }
 }
 

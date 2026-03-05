@@ -11,19 +11,19 @@ import { withSpinner } from '../ui/spinner';
 async function runStandup(options: { post?: boolean; channel?: string }): Promise<void> {
   const projectId = await requireTrackedRepo();
 
-  const [globalConfig, tasks, recentCommits] = await Promise.all([
+  const [globalConfig, branchesFile, recentCommits] = await Promise.all([
     configManager.getGlobalConfig(),
-    configManager.getTasks(projectId),
+    configManager.getBranches(projectId),
     getRecentCommits(20),
   ]);
 
-  const activeTasks = tasks.tasks
-    .filter((t) => ['active', 'pr_open'].includes(t.status))
-    .map((t) => (t.ticketId ? `${t.ticketId}: ${t.ticketTitle ?? t.branchName}` : t.branchName));
+  const activeBranches = branchesFile.branches
+    .filter((b) => ['active', 'pr_open'].includes(b.status))
+    .map((b) => (b.ticketId ? `${b.ticketId}: ${b.ticketTitle ?? b.branchName}` : b.branchName));
 
-  const recentPRs = tasks.tasks
-    .filter((t) => t.prNumber !== null)
-    .map((t) => `PR #${t.prNumber} (${t.prStatus ?? 'open'}) — ${t.ticketTitle ?? t.branchName}`);
+  const recentPRs = branchesFile.branches
+    .filter((b) => b.prNumber !== null)
+    .map((b) => `PR #${b.prNumber} (${b.prStatus ?? 'open'}) — ${b.ticketTitle ?? b.branchName}`);
 
   if (!globalConfig.anthropicApiKey) {
     console.error(
@@ -34,7 +34,10 @@ async function runStandup(options: { post?: boolean; channel?: string }): Promis
   }
   const claude = new ClaudeClient(globalConfig.anthropicApiKey);
   const standup = await withSpinner('Generating standup...', () =>
-    claude.complete(standupPrompt({ recentCommits, activeTasks, recentPRs }), SYSTEM_STANDUP),
+    claude.complete(
+      standupPrompt({ recentCommits, activeTasks: activeBranches, recentPRs }),
+      SYSTEM_STANDUP,
+    ),
   );
 
   console.log('\n' + theme.primaryBold('  Standup'));

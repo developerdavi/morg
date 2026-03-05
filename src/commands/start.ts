@@ -92,13 +92,13 @@ async function runStart(
     console.log(theme.success(`\n${symbols.success} On branch ${theme.primaryBold(branchName)}`));
   }
 
-  // Create task entry if it doesn't exist
+  // Create branch entry if it doesn't exist
   const now = new Date().toISOString();
-  const tasks = await configManager.getTasks(projectId);
-  const existing = tasks.tasks.find((t) => t.branchName === branchName);
+  const branches = await configManager.getBranches(projectId);
+  const existing = branches.branches.find((b) => b.branchName === branchName);
   if (!existing) {
-    tasks.tasks.push({
-      id: `task_${Date.now()}`,
+    branches.branches.push({
+      id: `branch_${Date.now()}`,
       branchName,
       ticketId,
       ticketTitle,
@@ -115,7 +115,7 @@ async function runStart(
     existing.lastAccessedAt = now;
     if (worktreePath) existing.worktreePath = worktreePath;
   }
-  await configManager.saveTasks(projectId, tasks);
+  await configManager.saveBranches(projectId, branches);
 
   if (ticketId) console.log(theme.muted(`  Ticket: ${ticketId}`));
 }

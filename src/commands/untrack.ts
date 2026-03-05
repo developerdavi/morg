@@ -8,16 +8,16 @@ async function runUntrack(branch?: string): Promise<void> {
   const projectId = await requireTrackedRepo();
   const branchName = branch ?? (await getCurrentBranch());
 
-  const tasks = await configManager.getTasks(projectId);
-  const before = tasks.tasks.length;
-  tasks.tasks = tasks.tasks.filter((t) => t.branchName !== branchName);
+  const branchesFile = await configManager.getBranches(projectId);
+  const before = branchesFile.branches.length;
+  branchesFile.branches = branchesFile.branches.filter((b) => b.branchName !== branchName);
 
-  if (tasks.tasks.length === before) {
+  if (branchesFile.branches.length === before) {
     console.log(theme.muted(`Branch ${branchName} is not tracked.`));
     return;
   }
 
-  await configManager.saveTasks(projectId, tasks);
+  await configManager.saveBranches(projectId, branchesFile);
   console.log(theme.success(`${symbols.success} Untracked ${branchName}`));
 }
 

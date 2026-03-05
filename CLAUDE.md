@@ -53,7 +53,7 @@ The key constraint: **`config/manager.ts` and `git/index.ts` are leaf nodes** �
 - `config.json` — global config (API keys, integration tokens)
 - `projects.json` — registry of morg-initialized repos
 - `projects/<id>/config.json` — per-project config (GitHub repo, Jira project key)
-- `projects/<id>/tasks.json` — task tracking (branch → ticket, PR status)
+- `projects/<id>/branches.json` — branch tracking (branch → ticket, PR status)
 
 All JSON state is read/written exclusively through `configManager` (never direct `fs` calls in commands). All external data is parsed through Zod schemas at the boundary.
 
@@ -62,7 +62,7 @@ All JSON state is read/written exclusively through `configManager` (never direct
 2. Implement the logic in a private `async function run<Name>()` in the same file
 3. Add static import + `register<Name>Command(program)` call in `src/index.ts`
 
-Commands that require a tracked repo call `requireTrackedRepo()` to get the `projectId`, then use `configManager.getTasks(projectId)` etc.
+Commands that require a tracked repo call `requireTrackedRepo()` to get the `projectId`, then use `configManager.getBranches(projectId)` etc.
 
 ### execa convention
 Always `{ reject: false }` — check `result.exitCode` instead of catching exceptions.
