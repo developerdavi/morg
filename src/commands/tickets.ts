@@ -23,8 +23,7 @@ function renderTicketDetail(ticket: Ticket): void {
     lines.push(``, `${theme.muted('Assignee:')}  ${ticket.assignee.name}`);
   }
   if (ticket.url) {
-    const shortUrl = `https://notion.so/${ticket.id.replace(/-/g, '')}`;
-    lines.push(``, `${theme.muted('URL:')}      ${theme.primary(shortUrl)}`);
+    lines.push(``, `${theme.muted('URL:')}      ${theme.primary(ticket.url)}`);
   }
   if (ticket.description) {
     lines.push(``, theme.muted(ticket.description));
@@ -83,7 +82,7 @@ async function runTicketActions(
     return;
   }
 
-  const url = ticket.url ? `https://notion.so/${ticket.id.replace(/-/g, '')}` : null;
+  const url = ticket.url;
 
   if (!url) return;
 
