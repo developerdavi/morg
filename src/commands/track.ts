@@ -3,10 +3,8 @@ import { configManager } from '../config/manager';
 import { getCurrentBranch } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
-import { withSpinner } from '../ui/spinner';
-import { getTicketsProvider } from '../utils/providers';
+import { fetchTicket } from '../utils/providers';
 import { isTicketId } from '../utils/ticket';
-import { IntegrationError } from '../utils/errors';
 
 async function runTrack(branch?: string, ticket?: string): Promise<void> {
   const projectId = await requireTrackedRepo();
@@ -25,21 +23,8 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
   // Fetch ticket info — integration must be configured and ticket must exist
   let ticketTitle: string | null = null;
   if (ticketId) {
-    const [globalConfig, projectConfig] = await Promise.all([
-      configManager.getGlobalConfig(),
-      configManager.getProjectConfig(projectId),
-    ]);
-    const provider = getTicketsProvider(globalConfig, projectConfig);
-    if (!provider) {
-      throw new IntegrationError(
-        'No tickets integration is enabled for this project.',
-        'notion/jira',
-        'Run: morg config and morg init to configure an integration.',
-      );
-    }
-    const t = await withSpinner(`Fetching ${ticketId}...`, () => provider.getTicket(ticketId!));
-    ticketTitle = t.title;
-    console.log(theme.muted(`  ${symbols.arrow} ${ticketTitle}`));
+    const ticket = await fetchTicket(projectId, ticketId);
+    ticketTitle = ticket.title;
   }
 
   const branchesFile = await configManager.getBranches(projectId);

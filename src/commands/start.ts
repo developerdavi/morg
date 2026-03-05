@@ -7,7 +7,7 @@ import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
-import { getTicketsProvider } from '../utils/providers';
+import { fetchTicket } from '../utils/providers';
 
 async function runStart(
   input: string,
@@ -21,26 +21,14 @@ async function runStart(
 
   if (isTicketId(input)) {
     ticketId = input.trim().toUpperCase();
+    branchName = ticketId.toLowerCase();
 
-    // Try to enrich from tickets provider if enabled
+    // Enrich from tickets provider if available — non-fatal if not configured or fetch fails
     try {
-      const [globalConfig, projectConfig] = await Promise.all([
-        configManager.getGlobalConfig(),
-        configManager.getProjectConfig(projectId),
-      ]);
-      const provider = getTicketsProvider(globalConfig, projectConfig);
-      if (provider) {
-        const ticket = await withSpinner(`Fetching ${ticketId}...`, () =>
-          provider.getTicket(ticketId!),
-        );
-        ticketTitle = ticket.title;
-        branchName = ticketId.toLowerCase();
-        console.log(theme.muted(`  ${symbols.arrow} ${ticketTitle}`));
-      } else {
-        branchName = ticketId.toLowerCase();
-      }
+      const ticket = await fetchTicket(projectId, ticketId);
+      ticketTitle = ticket.title;
     } catch {
-      branchName = ticketId.toLowerCase();
+      // no provider or fetch failed — proceed without title
     }
   } else {
     branchName = input;
