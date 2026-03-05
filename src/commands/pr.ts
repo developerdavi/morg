@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { execa } from 'execa';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, getDefaultBranch, getDiffWithBase, pushBranch } from '../git/index';
+import { getCurrentBranch, getDefaultBranch, getDiffWithBase, pushBranch, getCommitsOnBranch } from '../git/index';
 import { ghClient, ghPrToPrStatus } from '../integrations/github/client';
 import { ClaudeClient } from '../integrations/claude/client';
 import { prDescriptionPrompt, SYSTEM_PR_DESCRIPTION, prReviewPrompt, SYSTEM_PR_REVIEW } from '../integrations/claude/prompts';
@@ -10,7 +10,7 @@ import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { intro, outro, text } from '../ui/prompts';
 
-async function runPrCreate(options: { ai: boolean; draft?: boolean }): Promise<void> {
+async function runPrCreate(options: { ai: boolean; draft?: boolean; yes?: boolean; title?: string; body?: string }): Promise<void> {
   const projectId = await requireTrackedRepo();
 
   const [currentBranch, defaultBranch] = await Promise.all([
@@ -18,22 +18,32 @@ async function runPrCreate(options: { ai: boolean; draft?: boolean }): Promise<v
     getDefaultBranch(),
   ]);
 
-  const tasks = await configManager.getTasks(projectId);
+  const [tasks, commits] = await Promise.all([
+    configManager.getTasks(projectId),
+    getCommitsOnBranch(defaultBranch),
+  ]);
   const task = tasks.tasks.find((t) => t.branchName === currentBranch);
 
-  let defaultTitle = currentBranch.replace(/^(feat|fix|chore|docs)\//, '').replace(/-/g, ' ');
+  let defaultTitle: string;
+  if (commits.length === 1 && commits[0]) {
+    defaultTitle = commits[0];
+  } else {
+    defaultTitle = currentBranch.replace(/^(feat|fix|chore|docs)\//, '').replace(/-/g, ' ');
+  }
   if (task?.ticketId) defaultTitle = `${task.ticketId}: ${task.ticketTitle ?? defaultTitle}`;
 
   intro(theme.primaryBold('morg pr create'));
 
-  const title = await text({
-    message: 'PR title',
-    initialValue: defaultTitle,
-    validate: (v) => (v.trim() ? undefined : 'Required'),
-  });
+  const title = options.yes
+    ? (options.title ?? defaultTitle)
+    : await text({
+        message: 'PR title',
+        initialValue: options.title ?? defaultTitle,
+        validate: (v) => (v.trim() ? undefined : 'Required'),
+      });
 
-  let body = '';
-  if (options.ai) {
+  let body = options.body ?? '';
+  if (options.ai && !options.body) {
     try {
       const globalConfig = await configManager.getGlobalConfig();
       if (!globalConfig.anthropicApiKey) {
@@ -126,7 +136,10 @@ export function registerPrCommand(program: Command): void {
     .description('Create a pull request for the current branch')
     .option('--no-ai', 'Skip AI-generated PR description')
     .option('--draft', 'Create as draft PR')
-    .action((options: { ai: boolean; draft?: boolean }) => runPrCreate(options));
+    .option('-y, --yes', 'Skip prompts and use defaults (or --title/--body values)')
+    .option('--title <title>', 'PR title (skips title prompt)')
+    .option('--body <body>', 'PR body/description (skips AI generation)')
+    .action((options: { ai: boolean; draft?: boolean; yes?: boolean; title?: string; body?: string }) => runPrCreate(options));
 
   pr.command('review')
     .description('List and review open pull requests')
