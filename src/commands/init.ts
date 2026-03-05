@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import { getRepoRoot, getRemote } from '../git/index';
+import { getRepoRoot, getRemote, getDefaultBranch } from '../git/index';
 import { theme, symbols } from '../ui/theme';
 import { intro, outro, text, confirm } from '../ui/prompts';
 
@@ -47,6 +47,13 @@ async function runInit(): Promise<void> {
     validate: (v) => (v.includes('/') ? undefined : 'Format: owner/repo'),
   });
 
+  const detectedBranch = await getDefaultBranch();
+  const defaultBranch = await text({
+    message: 'Default branch (used as PR base and branch creation base)',
+    initialValue: detectedBranch,
+    validate: (v) => (v.trim() ? undefined : 'Required'),
+  });
+
   const jiraEnabled =
     globalConfig.integrations.jira?.enabled === true &&
     (await confirm({ message: 'Enable Jira for this project?', initialValue: true }));
@@ -74,6 +81,7 @@ async function runInit(): Promise<void> {
     projectId,
     githubUsername: globalConfig.githubUsername,
     githubRepo,
+    defaultBranch,
     integrations: {
       github: { enabled: true },
       jira: jiraEnabled && jiraProjectKey
