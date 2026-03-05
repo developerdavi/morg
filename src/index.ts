@@ -14,6 +14,7 @@ import { registerStandupCommand } from './commands/standup';
 import { registerPromptCommand } from './commands/prompt';
 import { registerUpdateCommand } from './commands/update';
 import { registerCompleteCommand } from './commands/complete';
+import { registerDeleteCommand } from './commands/delete';
 
 const program = new Command();
 
@@ -41,5 +42,6 @@ registerStandupCommand(program);
 registerPromptCommand(program);
 registerUpdateCommand(program);
 registerCompleteCommand(program);
+registerDeleteCommand(program);
 
 program.parseAsync(process.argv).catch(handleError);
