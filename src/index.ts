@@ -16,6 +16,7 @@ import { registerUpdateCommand } from './commands/update';
 import { registerCompleteCommand } from './commands/complete';
 import { registerDeleteCommand } from './commands/delete';
 import { registerTicketsCommand } from './commands/tickets';
+import { registerInstallClaudeSkillCommand } from './commands/install-claude-skill';
 
 const program = new Command();
 
@@ -23,8 +24,9 @@ program.name('morg').description('Developer productivity assistant').version('0.
 
 program.action(() => runStatus());
 
+const NO_CONFIG_COMMANDS = new Set(['config', 'install-claude-skill']);
 program.hook('preAction', async (_thisCommand, actionCommand) => {
-  if (actionCommand.name() !== 'config') await requireConfig();
+  if (!NO_CONFIG_COMMANDS.has(actionCommand.name())) await requireConfig();
 });
 
 registerConfigCommand(program);
@@ -42,5 +44,6 @@ registerUpdateCommand(program);
 registerCompleteCommand(program);
 registerDeleteCommand(program);
 registerTicketsCommand(program);
+registerInstallClaudeSkillCommand(program);
 
 program.parseAsync(process.argv).catch(handleError);
