@@ -3,6 +3,36 @@ import { configManager } from '../config/manager';
 import { getRepoRoot, getRemote, getDefaultBranch } from '../git/index';
 import { theme, symbols } from '../ui/theme';
 import { intro, outro, text, confirm } from '../ui/prompts';
+import { withSpinner } from '../ui/spinner';
+
+const NOTION_ID_RE = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})/i;
+const NOTION_HEADERS = (apiToken: string) => ({
+  Authorization: `Bearer ${apiToken}`,
+  'Notion-Version': '2022-06-28',
+});
+
+async function resolveNotionDatabaseId(apiToken: string, url: string): Promise<string> {
+  const match = NOTION_ID_RE.exec(url.split('?')[0] ?? url);
+  if (!match) throw new Error('No Notion ID found in that URL.');
+  const id = match[1]!;
+  const headers = NOTION_HEADERS(apiToken);
+
+  // If the URL points to a page inside a database, get the parent database ID
+  const pageRes = await fetch(`https://api.notion.com/v1/pages/${id}`, { headers });
+  if (pageRes.ok) {
+    const page = (await pageRes.json()) as { parent?: { type: string; database_id?: string } };
+    if (page.parent?.type === 'database_id' && page.parent.database_id) {
+      return page.parent.database_id;
+    }
+  }
+
+  // Otherwise treat the ID as the database itself
+  const dbRes = await fetch(`https://api.notion.com/v1/databases/${id}`, { headers });
+  if (dbRes.ok) return id;
+
+  const err = (await dbRes.json().catch(() => ({}))) as { message?: string };
+  throw new Error(err.message ?? `Could not find a database at that URL.`);
+}
 
 async function runInit(): Promise<void> {
   intro(theme.primaryBold('morg init'));
@@ -73,11 +103,19 @@ async function runInit(): Promise<void> {
 
   let notionDatabaseId: string | undefined;
   if (notionEnabled) {
-    const raw = await text({
-      message: 'Notion database ID (from the database URL)',
-      validate: (v) => (v.trim() ? undefined : 'Required'),
+    const notionUrl = await text({
+      message: 'Notion database URL (or URL of any page inside it)',
+      placeholder: 'https://www.notion.so/My-Database-8a4b8c3d2e1f4a5b9c6d7e8f9a0b1c2d',
+      validate: (v) => {
+        if (!v.trim()) return 'Required';
+        if (!NOTION_ID_RE.test(v.split('?')[0] ?? v))
+          return 'Could not find a Notion ID in that URL.';
+        return undefined;
+      },
     });
-    notionDatabaseId = raw.trim();
+    notionDatabaseId = await withSpinner('Resolving database...', () =>
+      resolveNotionDatabaseId(globalConfig.integrations.notion!.apiToken, notionUrl),
+    );
   }
 
   const now = new Date().toISOString();
