@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { configManager } from '../config/manager';
 import type { GlobalConfig } from '../config/schemas';
 import { theme, symbols } from '../ui/theme';
-import { intro, outro, text, password, confirm } from '../ui/prompts';
+import { intro, outro, text, password, confirm, select } from '../ui/prompts';
 
 async function runConfig(options: { show?: boolean }): Promise<void> {
   if (options.show) {
@@ -17,6 +17,7 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     console.log(`  githubUsername:  ${theme.primary(config.githubUsername)}`);
     if (config.anthropicApiKey)
       console.log(`  anthropicApiKey: ${theme.muted(redact(config.anthropicApiKey))}`);
+    console.log(`  autoStash:       ${theme.primary(config.autoStash)}`);
     if (config.integrations.jira?.enabled) {
       const j = config.integrations.jira;
       console.log(`  jira.baseUrl:    ${theme.primary(j.baseUrl)}`);
@@ -51,6 +52,16 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     validate: (v) => (!v.trim() || v.startsWith('sk-ant-') ? undefined : 'Must start with sk-ant-'),
   });
   const anthropicApiKey = anthropicApiKeyRaw.trim() || undefined;
+
+  const autoStash = await select({
+    message: 'Auto-stash dirty working tree on branch switch?',
+    options: [
+      { value: 'ask', label: 'Ask each time (remember last choice)' },
+      { value: 'always', label: 'Always stash automatically' },
+      { value: 'never', label: 'Never stash' },
+    ],
+    initialValue: existing?.autoStash ?? 'ask',
+  });
 
   const enableJira = await confirm({
     message: 'Enable Jira integration?',
@@ -98,6 +109,8 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     version: 1,
     githubUsername,
     anthropicApiKey,
+    autoStash,
+    lastStashChoice: existing?.lastStashChoice,
     integrations: { jira: jiraConfig, slack: slackConfig },
   });
 

@@ -1,13 +1,8 @@
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import {
-  getCurrentBranch,
-  isWorkingTreeDirty,
-  stash,
-  checkout,
-  branchExists,
-} from '../git/index';
+import { getCurrentBranch, checkout, branchExists } from '../git/index';
 import { isTicketId, branchNameFromTicket, extractTicketId } from '../utils/ticket';
+import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
@@ -46,13 +41,7 @@ async function runStart(input: string): Promise<void> {
     ticketId = extractTicketId(input);
   }
 
-  // Stash dirty working tree
-  if (await isWorkingTreeDirty()) {
-    const current = await getCurrentBranch();
-    await withSpinner(`Stashing changes on ${current}...`, () =>
-      stash(`morg: stash before switching to ${branchName}`),
-    );
-  }
+  await handleDirtyTree(await getCurrentBranch(), branchName);
 
   const exists = await branchExists(branchName);
   if (exists) {
