@@ -1,13 +1,8 @@
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import {
-  getCurrentBranch,
-  isWorkingTreeDirty,
-  stash,
-  stashPop,
-  checkout,
-} from '../git/index';
+import { getCurrentBranch, stashPop, checkout } from '../git/index';
 import { isTicketId } from '../utils/ticket';
+import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
@@ -53,17 +48,12 @@ async function runSwitch(input?: string): Promise<void> {
     branchName = input;
   }
 
-  const dirty = await isWorkingTreeDirty();
-  if (dirty) {
-    const current = await getCurrentBranch();
-    await withSpinner(`Stashing changes on ${current}...`, () =>
-      stash(`morg: stash before switching to ${branchName}`),
-    );
-  }
+  const currentForStash = await getCurrentBranch();
+  const stashed = await handleDirtyTree(currentForStash, branchName);
 
   await withSpinner(`Switching to ${branchName}...`, () => checkout(branchName));
 
-  if (dirty) {
+  if (stashed) {
     await stashPop().catch(() => {
       // Nothing to pop on this branch — ignore
     });
