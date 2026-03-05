@@ -97,3 +97,37 @@ export async function branchExists(branch: string): Promise<boolean> {
   const result = await execa('git', ['rev-parse', '--verify', branch], { reject: false });
   return result.exitCode === 0;
 }
+
+export async function addWorktree(worktreePath: string, branch: string, base?: string): Promise<void> {
+  const args = base
+    ? ['worktree', 'add', worktreePath, '-b', branch, base]
+    : ['worktree', 'add', worktreePath, branch];
+  const result = await execa('git', args, { reject: false });
+  if (result.exitCode !== 0) throw new GitError(`git worktree add failed: ${result.stderr}`);
+}
+
+export async function removeWorktree(worktreePath: string): Promise<void> {
+  const result = await execa('git', ['worktree', 'remove', '--force', worktreePath], { reject: false });
+  if (result.exitCode !== 0) throw new GitError(`git worktree remove failed: ${result.stderr}`);
+}
+
+export async function mergeBranch(branch: string, noFF = true): Promise<void> {
+  const args = noFF ? ['merge', '--no-ff', branch] : ['merge', branch];
+  const result = await execa('git', args, { reject: false });
+  if (result.exitCode !== 0) throw new GitError(`git merge failed: ${result.stderr}`);
+}
+
+export async function deleteBranch(branch: string): Promise<void> {
+  const result = await execa('git', ['branch', '-d', branch], { reject: false });
+  if (result.exitCode !== 0) throw new GitError(`git branch -d failed: ${result.stderr}`);
+}
+
+export async function pullBranch(branch: string): Promise<void> {
+  const result = await execa('git', ['pull', 'origin', branch], { reject: false });
+  if (result.exitCode !== 0) throw new GitError(`git pull failed: ${result.stderr}`);
+}
+
+export async function rebaseBranch(onto: string): Promise<void> {
+  const result = await execa('git', ['rebase', onto], { reject: false });
+  if (result.exitCode !== 0) throw new GitError(`git rebase failed: ${result.stderr}`);
+}

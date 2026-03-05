@@ -13,6 +13,7 @@ import { registerStatusCommand, runStatus } from './commands/status';
 import { registerStandupCommand } from './commands/standup';
 import { registerPromptCommand } from './commands/prompt';
 import { registerUpdateCommand } from './commands/update';
+import { registerCompleteCommand } from './commands/complete';
 
 const program = new Command();
 
@@ -39,5 +40,6 @@ registerStatusCommand(program);
 registerStandupCommand(program);
 registerPromptCommand(program);
 registerUpdateCommand(program);
+registerCompleteCommand(program);
 
 program.parseAsync(process.argv).catch(handleError);

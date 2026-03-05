@@ -86,12 +86,21 @@ export async function renderStatus(opts?: { branch?: string; short?: boolean }):
     chars: TABLE_CHARS,
   });
 
-  for (const task of activeTasks) {
+  const sortedTasks = [...activeTasks].sort((a, b) => {
+    const ta = a.lastAccessedAt ?? a.updatedAt;
+    const tb = b.lastAccessedAt ?? b.updatedAt;
+    return tb.localeCompare(ta);
+  });
+
+  for (const task of sortedTasks) {
     const isCurrent = task.branchName === currentBranch;
+    const wtBadge = task.worktreePath ? theme.muted(' [wt]') : '';
     const branch = isCurrent
-      ? theme.primaryBold(`${symbols.arrow} ${task.branchName}`)
-      : theme.muted(`  ${task.branchName}`);
-    const ticket = task.ticketId ? theme.primary(task.ticketId) : theme.muted('—');
+      ? theme.primaryBold(`${symbols.arrow} ${task.branchName}`) + wtBadge
+      : theme.muted(`  ${task.branchName}`) + wtBadge;
+    const ticketLine = task.ticketId ? theme.primary(task.ticketId) : theme.muted('—');
+    const titleLine = task.ticketTitle ? `\n${theme.muted(task.ticketTitle.slice(0, 30))}` : '';
+    const ticket = ticketLine + titleLine;
     const pr = task.prNumber
       ? `${prStatusLabel(task)} ${theme.muted(`#${task.prNumber}`)}`
       : theme.muted('—');

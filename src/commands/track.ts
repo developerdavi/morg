@@ -36,6 +36,7 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
     prNumber: null,
     prUrl: null,
     prStatus: null,
+    worktreePath: null,
   });
   await configManager.saveTasks(projectId, tasks);
   console.log(theme.success(`${symbols.success} Now tracking ${branchName}`));
