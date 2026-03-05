@@ -5,6 +5,11 @@ const BASE_URL = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
 
 type RichTextItem = { plain_text: string };
+type NotionBlock = {
+  type: string;
+  [key: string]: unknown;
+};
+
 type NotionProperty = {
   type: string;
   title?: RichTextItem[];
@@ -64,7 +69,12 @@ export class NotionClient implements TicketsProvider {
     const pages = await this.queryDatabase({ filter });
     const page = pages[0];
     if (!page) throw new Error(`Ticket ${ticketId} not found in Notion`);
-    return this.mapPage(page);
+
+    const [ticket, description] = await Promise.all([
+      Promise.resolve(this.mapPage(page)),
+      this.fetchPageContent(page.id),
+    ]);
+    return { ...ticket, description };
   }
 
   async listTickets(opts?: { status?: string }): Promise<Ticket[]> {
@@ -100,11 +110,56 @@ export class NotionClient implements TicketsProvider {
     }
   }
 
+  private async fetchPageContent(pageId: string): Promise<string> {
+    const res = await fetch(`${BASE_URL}/blocks/${pageId}/children`, {
+      headers: this.headers,
+    });
+    if (!res.ok) return '';
+    const data = (await res.json()) as { results: NotionBlock[] };
+
+    const lines: string[] = [];
+    for (const block of data.results) {
+      const content = block[block.type] as { rich_text?: RichTextItem[] } | undefined;
+      const text = content?.rich_text?.map((t) => t.plain_text).join('') ?? '';
+      if (!text) continue;
+      switch (block.type) {
+        case 'heading_1':
+          lines.push(`# ${text}`);
+          break;
+        case 'heading_2':
+          lines.push(`## ${text}`);
+          break;
+        case 'heading_3':
+          lines.push(`### ${text}`);
+          break;
+        case 'bulleted_list_item':
+          lines.push(`• ${text}`);
+          break;
+        case 'numbered_list_item':
+          lines.push(`- ${text}`);
+          break;
+        case 'code':
+          lines.push(`\`${text}\``);
+          break;
+        case 'quote':
+          lines.push(`> ${text}`);
+          break;
+        default:
+          lines.push(text);
+          break;
+      }
+    }
+    return lines.join('\n');
+  }
+
   private mapPage(page: NotionPage): Ticket {
     const props = page.properties;
 
     const titleProp = props[this.projectConfig.titleProperty];
-    const title = titleProp?.title?.[0]?.plain_text ?? titleProp?.rich_text?.[0]?.plain_text ?? '';
+    const title =
+      titleProp?.title?.map((t) => t.plain_text).join('') ??
+      titleProp?.rich_text?.map((t) => t.plain_text).join('') ??
+      '';
 
     const statusProp = props[this.projectConfig.statusProperty];
     const status = statusProp?.status?.name ?? statusProp?.select?.name ?? '';
