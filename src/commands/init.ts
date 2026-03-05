@@ -82,6 +82,7 @@ async function runInit(): Promise<void> {
     githubUsername: globalConfig.githubUsername,
     githubRepo,
     defaultBranch,
+    syncPull: 'ask',
     integrations: {
       github: { enabled: true },
       jira: jiraEnabled && jiraProjectKey

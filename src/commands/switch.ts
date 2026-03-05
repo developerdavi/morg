@@ -48,6 +48,19 @@ async function runSwitch(input?: string): Promise<void> {
     branchName = input;
   }
 
+  // Check if task has a worktree
+  const tasks = await configManager.getTasks(projectId);
+  const task = tasks.tasks.find((t) => t.branchName === branchName);
+
+  if (task?.worktreePath) {
+    // Update lastAccessedAt
+    task.lastAccessedAt = new Date().toISOString();
+    await configManager.saveTasks(projectId, tasks);
+    console.log(theme.success(`\n${symbols.success} Worktree branch ${theme.primaryBold(branchName)}`));
+    console.log(theme.muted(`  cd ${task.worktreePath}`));
+    return;
+  }
+
   const currentForStash = await getCurrentBranch();
   const stashed = await handleDirtyTree(currentForStash, branchName);
 
@@ -57,6 +70,12 @@ async function runSwitch(input?: string): Promise<void> {
     await stashPop().catch(() => {
       // Nothing to pop on this branch — ignore
     });
+  }
+
+  // Update lastAccessedAt
+  if (task) {
+    task.lastAccessedAt = new Date().toISOString();
+    await configManager.saveTasks(projectId, tasks);
   }
 
   console.log(theme.success(`\n${symbols.success} On branch ${theme.primaryBold(branchName)}`));

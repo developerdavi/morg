@@ -78,6 +78,7 @@ export const ProjectConfigSchema = z.object({
   githubUsername: z.string().min(1),
   githubRepo: z.string().min(1),
   defaultBranch: z.string().min(1).default('main'),
+  syncPull: z.enum(['always', 'ask', 'never']).default('ask'),
   integrations: ProjectIntegrationsSchema.default({}),
 });
 
@@ -109,6 +110,8 @@ export const TaskSchema = z.object({
   prNumber: z.number().nullable(),
   prUrl: z.string().url().nullable(),
   prStatus: PrStatusSchema,
+  worktreePath: z.string().nullable().default(null),
+  lastAccessedAt: z.string().datetime().optional(),
 });
 
 export const TasksFileSchema = z.object({

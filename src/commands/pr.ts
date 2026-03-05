@@ -29,7 +29,7 @@ async function runPrCreate(options: { ai: boolean; draft?: boolean; yes?: boolea
   if (commits.length === 1 && commits[0]) {
     defaultTitle = commits[0];
   } else {
-    defaultTitle = currentBranch.replace(/^(feat|fix|chore|docs)\//, '').replace(/-/g, ' ');
+    defaultTitle = currentBranch.replace(/-/g, ' ');
   }
   if (task?.ticketId) defaultTitle = `${task.ticketId}: ${task.ticketTitle ?? defaultTitle}`;
 
@@ -133,8 +133,33 @@ async function runPrReview(options: { ai?: boolean }): Promise<void> {
   console.log('');
 }
 
+async function runPrView(options: { web?: boolean }): Promise<void> {
+  const branch = await getCurrentBranch();
+  const pr = await withSpinner(`Fetching PR for ${branch}...`, () => ghClient.getPRForBranch(branch));
+
+  if (!pr) {
+    console.log(theme.muted(`No PR found for branch "${branch}".`));
+    return;
+  }
+
+  const draft = pr.isDraft ? theme.muted(' [draft]') : '';
+  const review = pr.reviewDecision ? `  ${theme.muted('Review:')} ${pr.reviewDecision}` : '';
+
+  console.log('');
+  console.log(`  ${theme.primaryBold(`#${pr.number}`)} ${pr.title}${draft}`);
+  console.log(`  ${theme.muted('URL:')}    ${theme.primary(pr.url)}`);
+  console.log(`  ${theme.muted('Base:')}   ${pr.baseRefName}`);
+  console.log(`  ${theme.muted('State:')}  ${pr.state}${pr.mergedAt ? ' (merged)' : ''}`);
+  if (review) console.log(review);
+  console.log('');
+
+  if (options.web) {
+    await execa('open', [pr.url], { reject: false });
+  }
+}
+
 export function registerPrCommand(program: Command): void {
-  const pr = program.command('pr').description('Pull request commands');
+  const pr = program.command('pr').description('Pull request commands').action(() => runPrView({}));
 
   pr.command('create')
     .description('Create a pull request for the current branch')
@@ -149,4 +174,9 @@ export function registerPrCommand(program: Command): void {
     .description('List and review open pull requests')
     .option('--ai', 'Include AI summaries')
     .action((options: { ai?: boolean }) => runPrReview(options));
+
+  pr.command('view')
+    .description('View the PR for the current branch')
+    .option('--web', 'Open in browser')
+    .action((options: { web?: boolean }) => runPrView(options));
 }
