@@ -24,6 +24,8 @@ export const GlobalConfigSchema = z.object({
   version: z.literal(1),
   githubUsername: z.string().min(1),
   anthropicApiKey: z.string().min(1).optional(),
+  autoStash: z.enum(['always', 'ask', 'never']).default('ask'),
+  lastStashChoice: z.enum(['stash', 'skip']).optional(),
   integrations: GlobalIntegrationsSchema.default({}),
 });
 
