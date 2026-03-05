@@ -34,8 +34,10 @@ export async function stashPop(): Promise<void> {
   if (result.exitCode !== 0) throw new GitError(`Stash pop failed: ${result.stderr}`);
 }
 
-export async function checkout(branch: string, create = false): Promise<void> {
-  const args = create ? ['checkout', '-b', branch] : ['checkout', branch];
+export async function checkout(branch: string, create = false, base?: string): Promise<void> {
+  const args = create
+    ? base ? ['checkout', '-b', branch, base] : ['checkout', '-b', branch]
+    : ['checkout', branch];
   const result = await execa('git', args, { reject: false });
   if (result.exitCode !== 0) throw new GitError(`Checkout failed: ${result.stderr}`);
 }
@@ -55,6 +57,18 @@ export async function getRecentCommits(n = 10): Promise<string[]> {
   const result = await execa('git', ['log', '--oneline', `-${n}`], { reject: false });
   if (result.exitCode !== 0) return [];
   return result.stdout.split('\n').filter(Boolean);
+}
+
+/** Returns commit subject lines for commits on HEAD that are not in baseBranch. */
+export async function getCommitsOnBranch(baseBranch: string): Promise<string[]> {
+  // Prefer the remote-tracking ref to avoid failures when a local branch doesn't exist
+  for (const ref of [`origin/${baseBranch}`, baseBranch]) {
+    const result = await execa('git', ['log', `${ref}..HEAD`, '--no-merges', '--format=%s'], { reject: false });
+    if (result.exitCode === 0) {
+      return result.stdout.split('\n').filter(Boolean);
+    }
+  }
+  return [];
 }
 
 export async function getRemote(): Promise<string | null> {
