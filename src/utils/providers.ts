@@ -144,7 +144,9 @@ export async function promptTicketInProgress(
     let inProgressStatus: string;
     if (statuses && statuses.length > 0) {
       const defaultInProgress =
-        statuses.find((s) => /in.?progress|started|working|doing/i.test(s)) ?? statuses[0]!;
+        statuses.find((s) => /in[\s-]?progress/i.test(s)) ??
+        statuses.find((s) => /\bstarted\b|\bworking\b|\bdoing\b/i.test(s) && !/not/i.test(s)) ??
+        statuses[0]!;
       if (mode === 'always') {
         inProgressStatus = defaultInProgress;
       } else {
