@@ -11,6 +11,7 @@ import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { confirm } from '../ui/prompts';
+import { promptTicketDone } from '../utils/providers';
 
 async function runComplete(
   branch: string | undefined,
@@ -54,6 +55,10 @@ async function runComplete(
 
   await withSpinner(`Switching to ${defaultBranch}...`, () => checkout(defaultBranch));
   await withSpinner(`Merging ${targetBranch}...`, () => mergeBranch(targetBranch));
+
+  if (trackedBranch.ticketId) {
+    await promptTicketDone(projectId, trackedBranch.ticketId);
+  }
 
   const now = new Date().toISOString();
   trackedBranch.status = 'done';

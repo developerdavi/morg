@@ -6,6 +6,7 @@ import { ClaudeClient } from '../integrations/claude/client';
 import type { Ticket, TicketsProvider, AIProvider } from '../integrations/providers/types';
 import { IntegrationError } from './errors';
 import { withSpinner } from '../ui/spinner';
+import { confirm, select, text } from '../ui/prompts';
 import { theme, symbols } from '../ui/theme';
 
 export function getTicketsProvider(
@@ -49,4 +50,45 @@ export async function fetchTicket(projectId: string, ticketId: string): Promise<
   const ticket = await withSpinner(`Fetching ${ticketId}...`, () => provider.getTicket(ticketId));
   console.log(theme.muted(`  ${symbols.arrow} ${ticket.title}`));
   return ticket;
+}
+
+/**
+ * Prompts the user to transition a ticket to a "done" status after a branch is merged.
+ * Non-fatal — silently skips if no provider is configured or the call fails.
+ */
+export async function promptTicketDone(projectId: string, ticketId: string): Promise<void> {
+  const [globalConfig, projectConfig] = await Promise.all([
+    configManager.getGlobalConfig(),
+    configManager.getProjectConfig(projectId),
+  ]);
+  const provider = getTicketsProvider(globalConfig, projectConfig);
+  if (!provider) return;
+
+  const ok = await confirm({ message: `Mark ticket ${ticketId} as done?`, initialValue: true });
+  if (!ok) return;
+
+  try {
+    const statuses = await provider.getStatuses?.();
+    let doneStatus: string;
+    if (statuses && statuses.length > 0) {
+      const defaultDone =
+        statuses.find((s) => /done|complete|closed|shipped|resolved/i.test(s)) ??
+        statuses[statuses.length - 1]!;
+      doneStatus = await select({
+        message: 'Done status:',
+        options: statuses.map((s) => ({ value: s, label: s })),
+        initialValue: defaultDone,
+      });
+    } else {
+      doneStatus = await text({ message: 'Done status:', initialValue: 'Done' });
+    }
+    await withSpinner(`Marking ${ticketId} as "${doneStatus}"...`, () =>
+      provider.transitionTicket(ticketId, doneStatus),
+    );
+    console.log(theme.success(`  ${symbols.success} Ticket ${ticketId} marked as "${doneStatus}"`));
+  } catch {
+    console.log(
+      theme.warning(`  ${symbols.warning} Could not update ticket ${ticketId} — skipping`),
+    );
+  }
 }

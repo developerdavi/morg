@@ -6,6 +6,7 @@ import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { confirm, select } from '../ui/prompts';
+import { promptTicketDone } from '../utils/providers';
 import {
   getCurrentBranch,
   checkout,
@@ -76,6 +77,9 @@ async function runSync(): Promise<void> {
       }
       branch.status = 'done';
       branch.updatedAt = new Date().toISOString();
+      if (branch.ticketId) {
+        await promptTicketDone(projectId, branch.ticketId);
+      }
     }
   }
 
