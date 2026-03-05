@@ -3,11 +3,44 @@ import { configManager } from '../config/manager';
 import { getCurrentBranch } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
+import { withSpinner } from '../ui/spinner';
+import { getTicketsProvider } from '../utils/providers';
+import { isTicketId } from '../utils/ticket';
+import { IntegrationError } from '../utils/errors';
 
 async function runTrack(branch?: string, ticket?: string): Promise<void> {
   const projectId = await requireTrackedRepo();
-  const branchName = branch ?? (await getCurrentBranch());
-  const ticketId = ticket?.toUpperCase() ?? null;
+
+  // If the first arg looks like a ticket ID, treat it as the ticket for the current branch
+  let branchName: string;
+  let ticketId: string | null;
+  if (branch && isTicketId(branch)) {
+    branchName = await getCurrentBranch();
+    ticketId = branch.toUpperCase();
+  } else {
+    branchName = branch ?? (await getCurrentBranch());
+    ticketId = ticket?.toUpperCase() ?? null;
+  }
+
+  // Fetch ticket info — integration must be configured and ticket must exist
+  let ticketTitle: string | null = null;
+  if (ticketId) {
+    const [globalConfig, projectConfig] = await Promise.all([
+      configManager.getGlobalConfig(),
+      configManager.getProjectConfig(projectId),
+    ]);
+    const provider = getTicketsProvider(globalConfig, projectConfig);
+    if (!provider) {
+      throw new IntegrationError(
+        'No tickets integration is enabled for this project.',
+        'notion/jira',
+        'Run: morg config and morg init to configure an integration.',
+      );
+    }
+    const t = await withSpinner(`Fetching ${ticketId}...`, () => provider.getTicket(ticketId!));
+    ticketTitle = t.title;
+    console.log(theme.muted(`  ${symbols.arrow} ${ticketTitle}`));
+  }
 
   const branchesFile = await configManager.getBranches(projectId);
   const existing = branchesFile.branches.find((b) => b.branchName === branchName);
@@ -15,6 +48,7 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
   if (existing) {
     if (ticketId) {
       existing.ticketId = ticketId;
+      existing.ticketTitle = ticketTitle;
       existing.updatedAt = new Date().toISOString();
       await configManager.saveBranches(projectId, branchesFile);
       console.log(
@@ -31,7 +65,7 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
     id: `branch_${Date.now()}`,
     branchName,
     ticketId,
-    ticketTitle: null,
+    ticketTitle,
     status: 'active',
     createdAt: now,
     updatedAt: now,
