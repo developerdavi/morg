@@ -67,6 +67,19 @@ async function runInit(): Promise<void> {
     jiraProjectKey = raw.trim().toUpperCase();
   }
 
+  const notionEnabled =
+    globalConfig.integrations.notion?.enabled === true &&
+    (await confirm({ message: 'Enable Notion for this project?', initialValue: true }));
+
+  let notionDatabaseId: string | undefined;
+  if (notionEnabled) {
+    const raw = await text({
+      message: 'Notion database ID (from the database URL)',
+      validate: (v) => (v.trim() ? undefined : 'Required'),
+    });
+    notionDatabaseId = raw.trim();
+  }
+
   const now = new Date().toISOString();
   await configManager.saveProjects({
     version: 1,
@@ -91,6 +104,16 @@ async function runInit(): Promise<void> {
               enabled: true,
               projectKey: jiraProjectKey,
               defaultTransitions: { start: 'In Progress', done: 'Done' },
+            }
+          : undefined,
+      notion:
+        notionEnabled && notionDatabaseId
+          ? {
+              enabled: true,
+              databaseId: notionDatabaseId,
+              titleProperty: 'Task name',
+              statusProperty: 'Status',
+              idProperty: 'ID',
             }
           : undefined,
     },
