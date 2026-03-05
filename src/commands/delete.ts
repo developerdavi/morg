@@ -28,8 +28,8 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
     process.exit(1);
   }
 
-  const tasks = await configManager.getTasks(projectId);
-  const task = tasks.tasks.find((t) => t.branchName === targetBranch);
+  const branches = await configManager.getBranches(projectId);
+  const trackedBranch = branches.branches.find((b) => b.branchName === targetBranch);
 
   if (!options.force && (await hasUnmergedCommits(targetBranch, defaultBranch))) {
     console.error(theme.error(`Branch "${targetBranch}" has unmerged commits.`));
@@ -37,7 +37,7 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
     process.exit(1);
   }
 
-  const ok = await confirm({ message: `Delete branch "${targetBranch}" and its task?` });
+  const ok = await confirm({ message: `Delete branch "${targetBranch}"?` });
   if (!ok) {
     console.log(theme.muted('Cancelled.'));
     return;
@@ -49,8 +49,8 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
   }
 
   // Remove worktree if present
-  if (task?.worktreePath) {
-    await withSpinner('Removing worktree...', () => removeWorktree(task.worktreePath!));
+  if (trackedBranch?.worktreePath) {
+    await withSpinner('Removing worktree...', () => removeWorktree(trackedBranch.worktreePath!));
   }
 
   // Delete the branch (-D to force if requested, -d otherwise)
@@ -61,12 +61,12 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
     process.exit(1);
   }
 
-  // Mark task as abandoned
-  if (task) {
-    task.status = 'abandoned';
-    task.updatedAt = new Date().toISOString();
-    if (task.worktreePath) task.worktreePath = null;
-    await configManager.saveTasks(projectId, tasks);
+  // Mark branch as abandoned
+  if (trackedBranch) {
+    trackedBranch.status = 'abandoned';
+    trackedBranch.updatedAt = new Date().toISOString();
+    if (trackedBranch.worktreePath) trackedBranch.worktreePath = null;
+    await configManager.saveBranches(projectId, branches);
   }
 
   console.log(theme.success(`\n${symbols.success} Deleted ${theme.primaryBold(targetBranch)}`));
@@ -75,7 +75,7 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
 export function registerDeleteCommand(program: Command): void {
   program
     .command('delete [branch]')
-    .description('Delete a task branch (only if fully merged; use -f to force)')
+    .description('Delete a tracked branch (only if fully merged; use -f to force)')
     .option('-f, --force', 'Delete even if the branch has unmerged commits')
     .action(runDelete);
 }

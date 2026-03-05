@@ -50,43 +50,43 @@ async function runSync(): Promise<void> {
     console.log(theme.success(`  ${symbols.success} Pulled latest ${defaultBranch}`));
   }
 
-  // ── Step 2: Load tasks ───────────────────────────────────────────────────────
-  const tasks = await configManager.getTasks(projectId);
-  const allTasks = tasks.tasks;
+  // ── Step 2: Load branches ────────────────────────────────────────────────────
+  const branchesFile = await configManager.getBranches(projectId);
+  const allBranches = branchesFile.branches;
 
-  // ── Step 3: Offer to clean up merged tasks ───────────────────────────────────
-  const mergedTasks = allTasks.filter((t) => t.status === 'pr_merged');
-  for (const task of mergedTasks) {
+  // ── Step 3: Offer to clean up merged branches ────────────────────────────────
+  const mergedBranches = allBranches.filter((b) => b.status === 'pr_merged');
+  for (const branch of mergedBranches) {
     const doDelete = await confirm({
-      message: `PR for ${theme.primary(task.branchName)} was merged. Delete local branch and mark done?`,
+      message: `PR for ${theme.primary(branch.branchName)} was merged. Delete local branch and mark done?`,
       initialValue: true,
     });
     if (doDelete) {
       const currentBranch = await getCurrentBranch();
-      if (currentBranch === task.branchName) {
+      if (currentBranch === branch.branchName) {
         await checkout(defaultBranch);
       }
       try {
-        await deleteBranch(task.branchName);
-        console.log(theme.success(`  ${symbols.success} Deleted branch ${task.branchName}`));
+        await deleteBranch(branch.branchName);
+        console.log(theme.success(`  ${symbols.success} Deleted branch ${branch.branchName}`));
       } catch {
         console.log(
-          theme.warning(`  ${symbols.warning} Could not delete ${task.branchName} — skipping`),
+          theme.warning(`  ${symbols.warning} Could not delete ${branch.branchName} — skipping`),
         );
       }
-      task.status = 'done';
-      task.updatedAt = new Date().toISOString();
+      branch.status = 'done';
+      branch.updatedAt = new Date().toISOString();
     }
   }
 
   // ── Step 4: Offer rebase/merge for active branches that have diverged ────────
-  const activeTasks = allTasks.filter((t) => ['active', 'pr_open'].includes(t.status));
-  for (const task of activeTasks) {
-    const diverged = await hasDiverged(task.branchName, defaultBranch);
+  const activeBranches = allBranches.filter((b) => ['active', 'pr_open'].includes(b.status));
+  for (const branch of activeBranches) {
+    const diverged = await hasDiverged(branch.branchName, defaultBranch);
     if (!diverged) continue;
 
     const action = await select<'rebase' | 'merge' | 'skip'>({
-      message: `${defaultBranch} has new commits not in ${task.branchName}. What do you want to do?`,
+      message: `${defaultBranch} has new commits not in ${branch.branchName}. What do you want to do?`,
       options: [
         { value: 'rebase', label: 'Rebase', hint: `git rebase ${defaultBranch}` },
         { value: 'merge', label: 'Merge', hint: `git merge --no-ff ${defaultBranch}` },
@@ -97,74 +97,74 @@ async function runSync(): Promise<void> {
     if (action === 'skip') continue;
 
     const currentBranch = await getCurrentBranch();
-    if (currentBranch !== task.branchName) {
-      await checkout(task.branchName);
+    if (currentBranch !== branch.branchName) {
+      await checkout(branch.branchName);
     }
 
     try {
       if (action === 'rebase') {
         await rebaseBranch(defaultBranch);
         console.log(
-          theme.success(`  ${symbols.success} Rebased ${task.branchName} onto ${defaultBranch}`),
+          theme.success(`  ${symbols.success} Rebased ${branch.branchName} onto ${defaultBranch}`),
         );
       } else {
         await mergeBranch(defaultBranch);
         console.log(
-          theme.success(`  ${symbols.success} Merged ${defaultBranch} into ${task.branchName}`),
+          theme.success(`  ${symbols.success} Merged ${defaultBranch} into ${branch.branchName}`),
         );
       }
     } catch {
       console.log(
         theme.warning(
-          `  ${symbols.warning} ${action} failed for ${task.branchName} — resolve conflicts manually`,
+          `  ${symbols.warning} ${action} failed for ${branch.branchName} — resolve conflicts manually`,
         ),
       );
     }
 
-    if (currentBranch !== task.branchName) {
+    if (currentBranch !== branch.branchName) {
       await checkout(currentBranch);
     }
   }
 
   // ── Step 5: Sync PR statuses with GitHub ────────────────────────────────────
-  const syncableTasks = allTasks.filter((t) => ['active', 'pr_open'].includes(t.status));
+  const syncableBranches = allBranches.filter((b) => ['active', 'pr_open'].includes(b.status));
 
-  if (syncableTasks.length === 0) {
-    await configManager.saveTasks(projectId, tasks);
-    console.log(theme.muted('No active tasks to sync with GitHub.'));
+  if (syncableBranches.length === 0) {
+    await configManager.saveBranches(projectId, branchesFile);
+    console.log(theme.muted('No active branches to sync with GitHub.'));
     return;
   }
 
   let updated = 0;
-  for (const task of syncableTasks) {
-    const pr = await withSpinner(`Checking ${task.branchName}...`, () =>
-      ghClient.getPRForBranch(task.branchName),
+  for (const branch of syncableBranches) {
+    const pr = await withSpinner(`Checking ${branch.branchName}...`, () =>
+      ghClient.getPRForBranch(branch.branchName),
     );
     if (!pr) continue;
 
     const prStatus = ghPrToPrStatus(pr);
-    const taskStatus = pr.mergedAt ? ('pr_merged' as const) : ('pr_open' as const);
+    const branchStatus = pr.mergedAt ? ('pr_merged' as const) : ('pr_open' as const);
 
-    if (task.prStatus !== prStatus || task.status !== taskStatus) {
-      task.prNumber = pr.number;
-      task.prUrl = pr.url;
-      task.prStatus = prStatus;
-      task.status = taskStatus;
-      task.updatedAt = new Date().toISOString();
+    if (branch.prStatus !== prStatus || branch.status !== branchStatus) {
+      branch.prNumber = pr.number;
+      branch.prUrl = pr.url;
+      branch.prStatus = prStatus;
+      branch.status = branchStatus;
+      branch.updatedAt = new Date().toISOString();
       updated++;
-      console.log(theme.success(`  ${symbols.success} ${task.branchName} → ${prStatus}`));
+      console.log(theme.success(`  ${symbols.success} ${branch.branchName} → ${prStatus}`));
     }
   }
 
-  await configManager.saveTasks(projectId, tasks);
+  await configManager.saveBranches(projectId, branchesFile);
 
   if (updated > 0) {
-    console.log(theme.success(`\nSynced ${updated} task(s).`));
+    console.log(theme.success(`\nSynced ${updated} branch(es).`));
   } else {
-    console.log(theme.muted('All tasks up to date.'));
+    console.log(theme.muted('All branches up to date.'));
   }
 }
 
 export function registerSyncCommand(program: Command): void {
-  program.command('sync').description('Sync task statuses with GitHub PRs').action(runSync);
+  program.command('sync').description('Sync branch statuses with GitHub PRs').action(runSync);
 }

@@ -19,18 +19,22 @@ async function runComplete(
   const projectId = await requireTrackedRepo();
 
   const targetBranch = branch ?? (await getCurrentBranch());
-  const tasks = await configManager.getTasks(projectId);
-  const task = tasks.tasks.find((t) => t.branchName === targetBranch);
+  const branches = await configManager.getBranches(projectId);
+  const trackedBranch = branches.branches.find((b) => b.branchName === targetBranch);
 
-  if (!task) {
-    console.error(theme.error(`No tracked task found for branch "${targetBranch}".`));
+  if (!trackedBranch) {
+    console.error(theme.error(`No tracked branch found for "${targetBranch}".`));
     process.exit(1);
   }
 
-  if (task.prStatus === 'open' || task.prStatus === 'needs_review' || task.prStatus === 'ready') {
+  if (
+    trackedBranch.prStatus === 'open' ||
+    trackedBranch.prStatus === 'needs_review' ||
+    trackedBranch.prStatus === 'ready'
+  ) {
     console.log(
       theme.warning(
-        `  ${symbols.arrow} PR #${task.prNumber} is still open. Consider merging via GitHub first.`,
+        `  ${symbols.arrow} PR #${trackedBranch.prNumber} is still open. Consider merging via GitHub first.`,
       ),
     );
   }
@@ -52,26 +56,26 @@ async function runComplete(
   await withSpinner(`Merging ${targetBranch}...`, () => mergeBranch(targetBranch));
 
   const now = new Date().toISOString();
-  task.status = 'done';
-  task.updatedAt = now;
+  trackedBranch.status = 'done';
+  trackedBranch.updatedAt = now;
 
-  if (task.worktreePath) {
-    await withSpinner(`Removing worktree...`, () => removeWorktree(task.worktreePath!));
-    task.worktreePath = null;
+  if (trackedBranch.worktreePath) {
+    await withSpinner(`Removing worktree...`, () => removeWorktree(trackedBranch.worktreePath!));
+    trackedBranch.worktreePath = null;
   }
 
   if (!options.noDelete) {
     await withSpinner(`Deleting branch ${targetBranch}...`, () => deleteBranch(targetBranch));
   }
 
-  await configManager.saveTasks(projectId, tasks);
+  await configManager.saveBranches(projectId, branches);
   console.log(theme.success(`\n${symbols.success} Completed ${theme.primaryBold(targetBranch)}`));
 }
 
 export function registerCompleteCommand(program: Command): void {
   program
     .command('complete [branch]')
-    .description('Merge a branch into the default branch and mark task as done')
+    .description('Merge a branch into the default branch and mark branch as done')
     .option('-y, --yes', 'Skip confirmation prompt')
     .option('--no-delete', 'Keep the branch after merging')
     .action(runComplete);

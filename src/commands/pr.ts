@@ -30,11 +30,11 @@ async function runPrCreate(options: {
   ]);
   const defaultBranch = projectConfig.defaultBranch;
 
-  const [tasks, commits] = await Promise.all([
-    configManager.getTasks(projectId),
+  const [branchesFile, commits] = await Promise.all([
+    configManager.getBranches(projectId),
     getCommitsOnBranch(defaultBranch),
   ]);
-  const task = tasks.tasks.find((t) => t.branchName === currentBranch);
+  const trackedBranch = branchesFile.branches.find((b) => b.branchName === currentBranch);
 
   let defaultTitle: string;
   if (commits.length === 1 && commits[0]) {
@@ -42,7 +42,8 @@ async function runPrCreate(options: {
   } else {
     defaultTitle = currentBranch.replace(/-/g, ' ');
   }
-  if (task?.ticketId) defaultTitle = `${task.ticketId}: ${task.ticketTitle ?? defaultTitle}`;
+  if (trackedBranch?.ticketId)
+    defaultTitle = `${trackedBranch.ticketId}: ${trackedBranch.ticketTitle ?? defaultTitle}`;
 
   intro(theme.primaryBold('morg pr create'));
 
@@ -63,7 +64,7 @@ async function runPrCreate(options: {
         const claude = new ClaudeClient(globalConfig.anthropicApiKey);
         bodyDefault = await withSpinner('Generating PR description with Claude...', () =>
           claude.complete(
-            prDescriptionPrompt(diff, currentBranch, task?.ticketTitle ?? undefined),
+            prDescriptionPrompt(diff, currentBranch, trackedBranch?.ticketTitle ?? undefined),
             SYSTEM_PR_DESCRIPTION,
           ),
         );
@@ -96,13 +97,13 @@ async function runPrCreate(options: {
     ghClient.createPR({ title, body, base: defaultBranch, draft: options.draft }),
   );
 
-  if (task) {
-    task.prNumber = pr.number;
-    task.prUrl = pr.url;
-    task.prStatus = ghPrToPrStatus(pr);
-    task.status = 'pr_open';
-    task.updatedAt = new Date().toISOString();
-    await configManager.saveTasks(projectId, tasks);
+  if (trackedBranch) {
+    trackedBranch.prNumber = pr.number;
+    trackedBranch.prUrl = pr.url;
+    trackedBranch.prStatus = ghPrToPrStatus(pr);
+    trackedBranch.status = 'pr_open';
+    trackedBranch.updatedAt = new Date().toISOString();
+    await configManager.saveBranches(projectId, branchesFile);
   }
 
   outro(theme.success(`${symbols.success} PR #${pr.number} created: ${theme.primary(pr.url)}`));

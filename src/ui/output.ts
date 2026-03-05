@@ -4,10 +4,10 @@ import { configManager } from '../config/manager';
 import { getCurrentBranch } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from './theme';
-import type { Task } from '../config/schemas';
+import type { Branch } from '../config/schemas';
 
-function statusLabel(task: Task): string {
-  switch (task.status) {
+function statusLabel(branch: Branch): string {
+  switch (branch.status) {
     case 'active':
       return theme.primary('active');
     case 'pr_open':
@@ -19,13 +19,13 @@ function statusLabel(task: Task): string {
     case 'abandoned':
       return theme.muted('abandoned');
     default:
-      return theme.muted(task.status);
+      return theme.muted(branch.status);
   }
 }
 
-function prStatusLabel(task: Task): string {
-  if (!task.prStatus) return theme.muted('—');
-  switch (task.prStatus) {
+function prStatusLabel(branch: Branch): string {
+  if (!branch.prStatus) return theme.muted('—');
+  switch (branch.prStatus) {
     case 'open':
       return theme.primary('open');
     case 'ready':
@@ -41,7 +41,7 @@ function prStatusLabel(task: Task): string {
     case 'closed':
       return theme.muted('closed');
     default:
-      return theme.muted(task.prStatus);
+      return theme.muted(branch.prStatus);
   }
 }
 
@@ -72,28 +72,30 @@ export async function renderStatus(opts?: { branch?: string; short?: boolean }):
     return;
   }
 
-  const [tasks, currentBranch] = await Promise.all([
-    configManager.getTasks(projectId),
+  const [branchesFile, currentBranch] = await Promise.all([
+    configManager.getBranches(projectId),
     getCurrentBranch(),
   ]);
 
   // Short mode for shell prompt integration
   if (opts?.short) {
-    const task = tasks.tasks.find((t) => t.branchName === (opts.branch ?? currentBranch));
-    if (task?.ticketId) process.stdout.write(theme.muted(`[${task.ticketId}]`));
+    const branch = branchesFile.branches.find(
+      (b) => b.branchName === (opts.branch ?? currentBranch),
+    );
+    if (branch?.ticketId) process.stdout.write(theme.muted(`[${branch.ticketId}]`));
     return;
   }
 
-  const activeTasks = tasks.tasks.filter((t) =>
-    ['active', 'pr_open', 'pr_merged'].includes(t.status),
+  const activeBranches = branchesFile.branches.filter((b) =>
+    ['active', 'pr_open', 'pr_merged'].includes(b.status),
   );
 
-  if (activeTasks.length === 0) {
+  if (activeBranches.length === 0) {
     console.log(
       boxen(
-        `${theme.muted('No active tasks.')}\n\n` +
-          `  ${symbols.arrow} ${theme.primary('morg start <branch|ticket>')}  start a new task\n` +
-          `  ${symbols.arrow} ${theme.primary('morg track')}                  track current branch`,
+        `${theme.muted('No active branches.')}\n\n` +
+          `  ${symbols.arrow} ${theme.primary('morg start <branch|ticket>')}  start a new branch\n` +
+          `  ${symbols.arrow} ${theme.primary('morg track')}                   track current branch`,
         {
           padding: 1,
           borderStyle: 'round',
@@ -117,26 +119,26 @@ export async function renderStatus(opts?: { branch?: string; short?: boolean }):
     chars: TABLE_CHARS,
   });
 
-  const sortedTasks = [...activeTasks].sort((a, b) => {
+  const sortedBranches = [...activeBranches].sort((a, b) => {
     const ta = a.lastAccessedAt ?? a.updatedAt;
     const tb = b.lastAccessedAt ?? b.updatedAt;
     return tb.localeCompare(ta);
   });
 
-  for (const task of sortedTasks) {
-    const isCurrent = task.branchName === currentBranch;
-    const wtBadge = task.worktreePath ? theme.muted(' [wt]') : '';
-    const branch = isCurrent
-      ? theme.primaryBold(`${symbols.arrow} ${task.branchName}`) + wtBadge
-      : theme.muted(`  ${task.branchName}`) + wtBadge;
-    const ticketLine = task.ticketId ? theme.primary(task.ticketId) : theme.muted('—');
-    const titleLine = task.ticketTitle ? `\n${theme.muted(task.ticketTitle.slice(0, 30))}` : '';
+  for (const branch of sortedBranches) {
+    const isCurrent = branch.branchName === currentBranch;
+    const wtBadge = branch.worktreePath ? theme.muted(' [wt]') : '';
+    const branchName = isCurrent
+      ? theme.primaryBold(`${symbols.arrow} ${branch.branchName}`) + wtBadge
+      : theme.muted(`  ${branch.branchName}`) + wtBadge;
+    const ticketLine = branch.ticketId ? theme.primary(branch.ticketId) : theme.muted('—');
+    const titleLine = branch.ticketTitle ? `\n${theme.muted(branch.ticketTitle.slice(0, 30))}` : '';
     const ticket = ticketLine + titleLine;
-    const pr = task.prNumber
-      ? `${prStatusLabel(task)} ${theme.muted(`#${task.prNumber}`)}`
+    const pr = branch.prNumber
+      ? `${prStatusLabel(branch)} ${theme.muted(`#${branch.prNumber}`)}`
       : theme.muted('—');
 
-    table.push([branch, ticket, statusLabel(task), pr]);
+    table.push([branchName, ticket, statusLabel(branch), pr]);
   }
 
   console.log('');

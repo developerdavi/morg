@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  GlobalConfigSchema,
-  ProjectConfigSchema,
-  TaskSchema,
-  TasksFileSchema,
-  ProjectsFileSchema,
-} from '../src/config/schemas';
+import { GlobalConfigSchema, BranchSchema, ProjectsFileSchema } from '../src/config/schemas';
 
 describe('GlobalConfigSchema', () => {
   it('parses valid config', () => {
@@ -41,12 +35,12 @@ describe('GlobalConfigSchema', () => {
   });
 });
 
-describe('TaskSchema', () => {
-  const validTask = {
-    id: 'task_123',
+describe('BranchSchema', () => {
+  const validBranch = {
+    id: 'branch_123',
     branchName: 'feat/MORG-1',
     ticketId: 'MORG-1',
-    ticketTitle: 'My task',
+    ticketTitle: 'My branch',
     status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -55,19 +49,19 @@ describe('TaskSchema', () => {
     prStatus: null,
   };
 
-  it('parses a valid task', () => {
-    expect(() => TaskSchema.parse(validTask)).not.toThrow();
+  it('parses a valid branch', () => {
+    expect(() => BranchSchema.parse(validBranch)).not.toThrow();
   });
 
   it('accepts all valid statuses', () => {
     const statuses = ['active', 'pr_open', 'pr_merged', 'done', 'abandoned'] as const;
     for (const status of statuses) {
-      expect(() => TaskSchema.parse({ ...validTask, status })).not.toThrow();
+      expect(() => BranchSchema.parse({ ...validBranch, status })).not.toThrow();
     }
   });
 
   it('rejects invalid status', () => {
-    expect(() => TaskSchema.parse({ ...validTask, status: 'unknown' })).toThrow();
+    expect(() => BranchSchema.parse({ ...validBranch, status: 'unknown' })).toThrow();
   });
 });
 

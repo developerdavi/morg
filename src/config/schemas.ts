@@ -85,20 +85,20 @@ export const ProjectConfigSchema = z.object({
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type JiraProjectConfig = z.infer<typeof JiraProjectConfigSchema>;
 
-// ─── Tasks (~/.morg/projects/[id]/tasks.json) ────────────────────────────────
+// ─── Branches (~/.morg/projects/[id]/branches.json) ──────────────────────────
 
-export const TaskStatusSchema = z.enum(['active', 'pr_open', 'pr_merged', 'done', 'abandoned']);
+export const BranchStatusSchema = z.enum(['active', 'pr_open', 'pr_merged', 'done', 'abandoned']);
 
 export const PrStatusSchema = z
   .enum(['open', 'ready', 'needs_review', 'changes_requested', 'approved', 'merged', 'closed'])
   .nullable();
 
-export const TaskSchema = z.object({
+export const BranchSchema = z.object({
   id: z.string().min(1),
   branchName: z.string().min(1),
   ticketId: z.string().nullable(),
   ticketTitle: z.string().nullable(),
-  status: TaskStatusSchema,
+  status: BranchStatusSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   prNumber: z.number().nullable(),
@@ -108,12 +108,12 @@ export const TaskSchema = z.object({
   lastAccessedAt: z.string().datetime().optional(),
 });
 
-export const TasksFileSchema = z.object({
+export const BranchesFileSchema = z.object({
   version: z.literal(1),
-  tasks: z.array(TaskSchema),
+  branches: z.array(BranchSchema),
 });
 
-export type Task = z.infer<typeof TaskSchema>;
-export type TaskStatus = z.infer<typeof TaskStatusSchema>;
+export type Branch = z.infer<typeof BranchSchema>;
+export type BranchStatus = z.infer<typeof BranchStatusSchema>;
 export type PrStatus = z.infer<typeof PrStatusSchema>;
-export type TasksFile = z.infer<typeof TasksFileSchema>;
+export type BranchesFile = z.infer<typeof BranchesFileSchema>;
