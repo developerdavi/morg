@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { z } from 'zod';
@@ -19,6 +19,8 @@ import {
   projectConfigFile,
   projectBranchesFile,
   projectDir,
+  profileConfigFile,
+  profilesDir,
 } from './paths';
 import { ConfigError } from '../utils/errors';
 
@@ -42,15 +44,46 @@ async function writeJson(path: string, data: unknown): Promise<void> {
 
 class ConfigManager {
   async getGlobalConfig(): Promise<GlobalConfig> {
+    let raw: GlobalConfig;
     try {
-      return await readJson(CONFIG_FILE, GlobalConfigSchema);
+      raw = await readJson(CONFIG_FILE, GlobalConfigSchema);
     } catch {
       throw new ConfigError('morg is not configured.', 'Run: morg config');
+    }
+
+    // Apply profile overlay: env var takes precedence over activeProfile field
+    const profileName = process.env.MORG_PROFILE ?? raw.activeProfile;
+    if (!profileName) return raw;
+
+    const profilePath = profileConfigFile(profileName);
+    if (!existsSync(profilePath)) return raw;
+
+    try {
+      const overlay = await readJson(profilePath, GlobalConfigSchema);
+      return {
+        ...raw,
+        ...overlay,
+        integrations: { ...raw.integrations, ...overlay.integrations },
+        activeProfile: raw.activeProfile,
+      };
+    } catch {
+      return raw;
     }
   }
 
   async saveGlobalConfig(config: GlobalConfig): Promise<void> {
     await writeJson(CONFIG_FILE, config);
+  }
+
+  async saveProfileConfig(name: string, config: GlobalConfig): Promise<void> {
+    await writeJson(profileConfigFile(name), config);
+  }
+
+  async listProfiles(): Promise<string[]> {
+    const dir = profilesDir();
+    if (!existsSync(dir)) return [];
+    const entries = await readdir(dir, { withFileTypes: true });
+    return entries.filter((e) => e.isDirectory()).map((e) => e.name);
   }
 
   async hasGlobalConfig(): Promise<boolean> {

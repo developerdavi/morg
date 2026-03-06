@@ -1,20 +1,4 @@
-export type Ticket = {
-  id: string;
-  key: string;
-  title: string;
-  status: string;
-  url: string | null;
-  assignee?: { name: string; email?: string } | null;
-  description?: string;
-};
-
-export interface TicketsProvider {
-  getTicket(ticketId: string): Promise<Ticket>;
-  listTickets(opts?: { status?: string }): Promise<Ticket[]>;
-  transitionTicket(ticketId: string, transitionName: string): Promise<void>;
-  getStatuses?(): Promise<string[]>;
-}
-
-export interface AIProvider {
-  complete(prompt: string, systemPrompt?: string): Promise<string>;
-}
+// Barrel re-export from domain-organized provider files
+export type { Ticket, TicketsProvider } from './tickets/tickets-provider';
+export type { AIProvider } from './ai/ai-provider';
+export type { MessagingProvider } from './messaging/messaging-provider';

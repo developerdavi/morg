@@ -35,6 +35,7 @@ export const GlobalConfigSchema = z.object({
   autoDeleteMerged: z.enum(['always', 'ask', 'never']).default('ask'),
   autoUpdateTicketStatus: z.enum(['always', 'ask', 'never']).default('ask'),
   integrations: GlobalIntegrationsSchema.default({}),
+  activeProfile: z.string().optional(),
 });
 
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;

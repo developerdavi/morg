@@ -90,6 +90,26 @@ export class GhClient {
     });
     return result.stdout;
   }
+
+  async getPRChecks(
+    prNumber: number,
+  ): Promise<{ name: string; state: string; conclusion: string | null }[]> {
+    const result = await execa(
+      'gh',
+      ['pr', 'checks', String(prNumber), '--json', 'name,state,conclusion'],
+      { reject: false, env: await this.ghEnv() },
+    );
+    if (result.exitCode !== 0 || !result.stdout.trim()) return [];
+    try {
+      return JSON.parse(result.stdout) as {
+        name: string;
+        state: string;
+        conclusion: string | null;
+      }[];
+    } catch {
+      return [];
+    }
+  }
 }
 
 export const ghClient = new GhClient();

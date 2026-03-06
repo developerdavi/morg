@@ -2,8 +2,7 @@ import type { Command } from 'commander';
 import { execa } from 'execa';
 import { configManager } from '../config/manager';
 import { getCurrentBranch, getDiffWithBase, pushBranch, getCommitsOnBranch } from '../git/index';
-import { GhClient, ghClient, ghPrToPrStatus } from '../integrations/github/client';
-import { ClaudeClient } from '../integrations/claude/client';
+import { ghClient, ghPrToPrStatus } from '../integrations/github/client';
 import {
   prDescriptionPrompt,
   SYSTEM_PR_DESCRIPTION,
@@ -15,6 +14,7 @@ import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { intro, outro, text } from '../ui/prompts';
+import { registry } from '../services/registry';
 
 async function runPrCreate(options: {
   ai: boolean;
@@ -30,7 +30,7 @@ async function runPrCreate(options: {
     configManager.getProjectConfig(projectId),
   ]);
   const defaultBranch = projectConfig.defaultBranch;
-  const gh = new GhClient(projectConfig.githubUsername);
+  const gh = await registry.gh();
 
   const [branchesFile, commits] = await Promise.all([
     configManager.getBranches(projectId),
@@ -59,13 +59,12 @@ async function runPrCreate(options: {
 
   let bodyDefault = options.body ?? '';
   if (options.ai && !options.body) {
-    const globalConfig = await configManager.getGlobalConfig();
-    if (globalConfig.anthropicApiKey) {
+    const ai = await registry.ai();
+    if (ai) {
       try {
         const diff = await withSpinner('Getting diff...', () => getDiffWithBase(defaultBranch));
-        const claude = new ClaudeClient(globalConfig.anthropicApiKey);
         bodyDefault = await withSpinner('Generating PR description with Claude...', () =>
-          claude.complete(
+          ai.complete(
             prDescriptionPrompt(diff, currentBranch, trackedBranch?.ticketTitle ?? undefined),
             SYSTEM_PR_DESCRIPTION,
           ),
@@ -134,14 +133,13 @@ async function runPrReview(options: { ai?: boolean }): Promise<void> {
 
     if (options.ai) {
       try {
-        const globalConfig = await configManager.getGlobalConfig();
-        if (!globalConfig.anthropicApiKey) continue;
+        const ai = await registry.ai();
+        if (!ai) continue;
         const diff = await withSpinner(`  Getting diff for #${pr.number}...`, () =>
           ghClient.getPRDiff(pr.number),
         );
-        const claude = new ClaudeClient(globalConfig.anthropicApiKey);
         const summary = await withSpinner(`  Summarizing #${pr.number}...`, () =>
-          claude.complete(prReviewPrompt(diff, pr.title), SYSTEM_PR_REVIEW),
+          ai.complete(prReviewPrompt(diff, pr.title), SYSTEM_PR_REVIEW),
         );
         console.log(theme.muted(`\n  ${symbols.info} ${summary.replace(/\n/g, '\n  ')}`));
       } catch (err) {
@@ -157,7 +155,10 @@ async function runPrReview(options: { ai?: boolean }): Promise<void> {
   console.log('');
 }
 
-async function runPrView(branchArg: string | undefined, options: { web?: boolean }): Promise<void> {
+async function runPrView(
+  branchArg: string | undefined,
+  options: { web?: boolean; json?: boolean; wait?: boolean; timeout?: number },
+): Promise<void> {
   const projectId = await requireTrackedRepo().catch(() => undefined);
   const projectConfig = projectId
     ? await configManager.getProjectConfig(projectId).catch(() => undefined)
@@ -165,7 +166,6 @@ async function runPrView(branchArg: string | undefined, options: { web?: boolean
 
   let branch: string;
   if (branchArg) {
-    // Resolve via registry (handles ticket IDs and case-insensitive branch names)
     if (projectId) {
       const branchesFile = await configManager.getBranches(projectId).catch(() => undefined);
       const found = branchesFile
@@ -179,11 +179,20 @@ async function runPrView(branchArg: string | undefined, options: { web?: boolean
     branch = await getCurrentBranch();
   }
 
-  const gh = new GhClient(projectConfig?.githubUsername);
+  const gh = await (projectConfig ? registry.gh() : Promise.resolve(ghClient));
   const pr = await withSpinner(`Fetching PR for ${branch}...`, () => gh.getPRForBranch(branch));
 
   if (!pr) {
+    if (options.json) {
+      process.stdout.write(JSON.stringify({ pr: null }, null, 2) + '\n');
+      return;
+    }
     console.log(theme.muted(`No PR found for branch "${branch}".`));
+    return;
+  }
+
+  if (options.json) {
+    process.stdout.write(JSON.stringify({ pr }, null, 2) + '\n');
     return;
   }
 
@@ -196,10 +205,59 @@ async function runPrView(branchArg: string | undefined, options: { web?: boolean
   console.log(`  ${theme.muted('Base:')}   ${pr.baseRefName}`);
   console.log(`  ${theme.muted('State:')}  ${pr.state}${pr.mergedAt ? ' (merged)' : ''}`);
   if (review) console.log(review);
+
+  // CI status
+  try {
+    const checks = await gh.getPRChecks(pr.number);
+    if (checks.length > 0) {
+      const passing = checks.filter((c) => c.conclusion?.toUpperCase() === 'SUCCESS').length;
+      const failing = checks.filter((c) => c.conclusion?.toUpperCase() === 'FAILURE').length;
+      const pending = checks.filter((c) => !c.conclusion && c.state !== 'COMPLETED').length;
+      let ciLine = `  ${theme.muted('CI:')}     `;
+      if (failing > 0) {
+        ciLine += theme.error(`✗ ${failing}/${checks.length} failing`);
+        if (passing > 0) ciLine += theme.muted(`  |  `) + theme.success(`✓ ${passing} passing`);
+      } else if (pending > 0) {
+        ciLine += theme.muted(`⏳ ${pending} pending`);
+        if (passing > 0) ciLine += ` · ` + theme.success(`✓ ${passing} passing`);
+      } else if (passing > 0) {
+        ciLine += theme.success(`✓ ${passing}/${checks.length} passing`);
+      }
+      console.log(ciLine);
+    }
+  } catch {
+    // CI status is non-fatal
+  }
+
   console.log('');
 
   if (options.web) {
     await execa('open', [pr.url], { reject: false });
+  }
+
+  if (options.wait) {
+    const timeoutMs = (options.timeout ?? 600) * 1000;
+    const start = Date.now();
+    process.stdout.write(theme.muted('  Waiting for checks'));
+    while (Date.now() - start < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, 15_000));
+      const checks = await gh.getPRChecks(pr.number);
+      if (checks.length === 0) {
+        process.stdout.write('.');
+        continue;
+      }
+      if (checks.every((c) => c.conclusion?.toUpperCase() === 'SUCCESS')) {
+        console.log('\n' + theme.success(`  ${symbols.success} All checks passed`));
+        return;
+      }
+      if (checks.some((c) => c.conclusion?.toUpperCase() === 'FAILURE')) {
+        console.log('\n' + theme.error(`  ${symbols.error ?? symbols.warning} A check failed`));
+        process.exit(1);
+      }
+      process.stdout.write('.');
+    }
+    console.log('\n' + theme.error('  Timeout waiting for checks'));
+    process.exit(1);
   }
 }
 
@@ -229,5 +287,13 @@ export function registerPrCommand(program: Command): void {
   pr.command('view [branch]')
     .description('View the PR for the current branch (or a specified branch/ticket)')
     .option('--web', 'Open in browser')
-    .action((branch: string | undefined, options: { web?: boolean }) => runPrView(branch, options));
+    .option('--json', 'Output as JSON')
+    .option('--wait', 'Wait for all CI checks to complete')
+    .option('--timeout <seconds>', 'Timeout in seconds for --wait (default: 600)', parseInt)
+    .action(
+      (
+        branch: string | undefined,
+        options: { web?: boolean; json?: boolean; wait?: boolean; timeout?: number },
+      ) => runPrView(branch, options),
+    );
 }

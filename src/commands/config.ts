@@ -175,9 +175,61 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
 }
 
 export function registerConfigCommand(program: Command): void {
-  program
+  const config = program
     .command('config')
     .description('Configure morg (API keys, integrations)')
     .option('--show', 'Show current config (tokens redacted)')
     .action((options: { show?: boolean }) => runConfig(options));
+
+  const profile = config.command('profile').description('Manage configuration profiles');
+
+  profile
+    .command('list')
+    .description('List available profiles')
+    .action(async () => {
+      const profiles = await configManager.listProfiles();
+      const current = (await configManager.getGlobalConfig().catch(() => null))?.activeProfile;
+      if (profiles.length === 0) {
+        console.log(
+          theme.muted('No profiles found. Create one with: morg config profile create <name>'),
+        );
+        return;
+      }
+      console.log(theme.primaryBold('\n  Profiles'));
+      for (const p of profiles) {
+        const active = p === current ? theme.success(' (active)') : '';
+        console.log(`  ${theme.primary(p)}${active}`);
+      }
+      console.log('');
+    });
+
+  profile
+    .command('create <name>')
+    .description('Create a new profile from current config')
+    .action(async (name: string) => {
+      const config = await configManager.getGlobalConfig();
+      await configManager.saveProfileConfig(name, config);
+      console.log(
+        theme.success(
+          `${symbols.success} Profile "${name}" created at ~/.morg/profiles/${name}/config.json`,
+        ),
+      );
+      console.log(theme.muted(`  Use: MORG_PROFILE=${name} morg <command>`));
+      console.log(theme.muted(`  Or activate: morg config profile use ${name}`));
+    });
+
+  profile
+    .command('use <name>')
+    .description('Activate a named profile (sets activeProfile)')
+    .action(async (name: string) => {
+      const profiles = await configManager.listProfiles();
+      if (!profiles.includes(name)) {
+        console.error(theme.error(`Profile "${name}" not found. Run: morg config profile list`));
+        process.exit(1);
+      }
+      const config = await configManager.getGlobalConfig();
+      config.activeProfile = name;
+      await configManager.saveGlobalConfig(config);
+      console.log(theme.success(`${symbols.success} Switched to profile "${name}"`));
+    });
 }

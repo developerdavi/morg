@@ -9,9 +9,9 @@ import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { select, text } from '../ui/prompts';
-import { getTicketsProvider } from '../utils/providers';
+import { registry } from '../services/registry';
 import { IntegrationError } from '../utils/errors';
-import type { Ticket, TicketsProvider } from '../integrations/providers/types';
+import type { Ticket, TicketsProvider } from '../integrations/providers/tickets/tickets-provider';
 import type { Branch } from '../config/schemas';
 import { runStart } from './start';
 
@@ -145,11 +145,12 @@ async function runTicketActions(
 
 async function runTickets(
   ticketId: string | undefined,
-  options: { plain?: boolean },
+  options: { plain?: boolean; json?: boolean },
   resolveFromBranch = false,
 ): Promise<void> {
   const projectId = await requireTrackedRepo();
   const plain = options.plain ?? false;
+  const json = options.json ?? false;
 
   const [branchesFile, currentBranch] = await Promise.all([
     configManager.getBranches(projectId),
@@ -163,11 +164,7 @@ async function runTickets(
     resolvedId = branch?.ticketId ?? undefined;
   }
 
-  const [globalConfig, projectConfig] = await Promise.all([
-    configManager.getGlobalConfig(),
-    configManager.getProjectConfig(projectId),
-  ]);
-  const provider = getTicketsProvider(globalConfig, projectConfig);
+  const provider = await registry.tickets();
   if (!provider) {
     throw new IntegrationError(
       'No tickets integration is enabled for this project.',
@@ -181,6 +178,12 @@ async function runTickets(
     const ticket = await withSpinner(`Fetching ${resolvedId}...`, () =>
       provider.getTicket(resolvedId!),
     );
+
+    if (json) {
+      process.stdout.write(JSON.stringify({ ticket }, null, 2) + '\n');
+      return;
+    }
+
     renderTicketDetail(ticket);
     if (!plain) {
       const trackedBranchName = getTrackedBranchForTicket(branchesFile.branches, ticket.key);
@@ -191,6 +194,12 @@ async function runTickets(
 
   // No ticket ID — list all tickets
   const tickets = await withSpinner('Fetching tickets...', () => provider.listTickets());
+
+  if (json) {
+    process.stdout.write(JSON.stringify({ tickets }, null, 2) + '\n');
+    return;
+  }
+
   if (tickets.length === 0) {
     console.log(theme.muted('No tickets found.'));
     return;
@@ -241,7 +250,8 @@ export function registerTicketsCommand(program: Command): void {
     .command('tickets [id]')
     .description('List all tickets, or show detail for a specific ticket')
     .option('--plain', 'Output list/detail without interactive prompts (for scripts/pipes)')
-    .action((id: string | undefined, options: { plain?: boolean }) =>
+    .option('--json', 'Output as JSON (for scripting)')
+    .action((id: string | undefined, options: { plain?: boolean; json?: boolean }) =>
       runTickets(id, options, false),
     );
 
@@ -250,7 +260,8 @@ export function registerTicketsCommand(program: Command): void {
     .command('ticket [id]')
     .description('Show ticket details (defaults to current branch ticket)')
     .option('--plain', 'Output without interactive prompts (for scripts/pipes)')
-    .action((id: string | undefined, options: { plain?: boolean }) =>
+    .option('--json', 'Output as JSON (for scripting)')
+    .action((id: string | undefined, options: { plain?: boolean; json?: boolean }) =>
       runTickets(id, options, true),
     );
 }

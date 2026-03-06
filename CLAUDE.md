@@ -43,11 +43,47 @@ src/git/index.ts          — pure git primitives via execa, no business logic
 src/utils/detect.ts       — requireConfig(), requireTrackedRepo(), detectTools()
 src/ui/                   — rendering only (theme, prompts, spinner, output panel)
 src/integrations/*/       — pure API clients (GhClient, JiraClient, SlackClient, ClaudeClient)
+src/services/registry.ts  — ServiceRegistry singleton: only place clients are instantiated
 src/commands/             — orchestration: imports from all layers, owns all business logic
 src/index.ts              — Commander wiring + preAction hook
 ```
 
 The key constraint: **`config/manager.ts` and `git/index.ts` are leaf nodes** — they import nothing from the rest of `src/`. Circular dependencies are prevented by keeping all orchestration in `src/commands/`.
+
+## Service Registry (DI Pattern)
+
+All integration clients are instantiated via the `registry` singleton in `src/services/registry.ts`.
+**Commands MUST NOT import integration clients (JiraClient, GhClient, ClaudeClient, SlackClient) directly.**
+
+Instead:
+```typescript
+import { registry } from '../services/registry';
+
+const gh = await registry.gh();           // GhClient — always present
+const tickets = await registry.tickets(); // TicketsProvider | null — check before use
+const ai = await registry.ai();          // AIProvider | null — check before use
+const messaging = await registry.messaging(); // MessagingProvider | null
+```
+
+`projectId` is resolved internally by the registry via `requireTrackedRepo()`. Commands still call
+`requireTrackedRepo()` directly when they need `projectId` for `configManager.getBranches()` etc.
+
+## Adding a New Integration
+
+1. Create `src/integrations/providers/<domain>/implementations/<name>-<domain>-provider.ts`
+   and implement `TicketsProvider`, `AIProvider`, or `MessagingProvider`
+2. Add one async method to the `Registry` class in `src/services/registry.ts`
+3. Add config schemas in `src/config/schemas.ts`
+4. Write tests in `tests/integrations/<name>.test.ts`
+5. Update this file
+
+## Testing
+
+- Unit tests: pure functions, mock all I/O
+- Service tests (`tests/services/`): mock `configManager` and `requireTrackedRepo` with `vi.mock()`
+- Provider tests (`tests/utils/`): mock `registry` and UI helpers
+- Integration tests (`tests/integrations/`): stub `fetch` or `execa` to test client parsing/errors
+- Run all: `pnpm test`  |  Single file: `pnpm test tests/integrations/jira.test.ts`
 
 ### State files (all under `~/.morg/`)
 - `config.json` — global config (API keys, integration tokens)
@@ -68,7 +104,13 @@ Commands that require a tracked repo call `requireTrackedRepo()` to get the `pro
 Always `{ reject: false }` — check `result.exitCode` instead of catching exceptions.
 
 ### Integration clients
-All clients are instantiated per-call with config from `configManager.getGlobalConfig()`. There are no global integration singletons (except `ghClient` which wraps the `gh` CLI and needs no credentials directly).
+All clients are instantiated exclusively via `registry` in `src/services/registry.ts`. Commands never call `new JiraClient(...)` or `new ClaudeClient(...)` directly.
 
 ### `preAction` hook
-All commands except `config` require a valid `~/.morg/config.json`. The hook in `src/index.ts` calls `requireConfig()` before every action except `config`.
+All commands except `config`, `install-claude-skill`, and `completion` require a valid `~/.morg/config.json`. The hook in `src/index.ts` calls `requireConfig()` before every action not in `NO_CONFIG_COMMANDS`.
+
+### Error exit codes
+- `MorgError` → exit 1 (generic)
+- `IntegrationError` → exit 3
+- `GitError` → exit 4
+- `ConfigError` → exit 5

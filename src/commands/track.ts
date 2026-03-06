@@ -5,6 +5,7 @@ import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { fetchTicket } from '../utils/providers';
 import { isTicketId, findBranchCaseInsensitive } from '../utils/ticket';
+import { registry } from '../services/registry';
 
 async function runTrack(branch?: string, ticket?: string): Promise<void> {
   const projectId = await requireTrackedRepo();
@@ -23,13 +24,16 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
   // Fetch ticket info — non-fatal; if fetch fails, branch is tracked without a ticket link
   let ticketTitle: string | null = null;
   if (ticketId) {
-    try {
-      const ticket = await fetchTicket(projectId, ticketId);
-      ticketTitle = ticket.title;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.log(theme.warning(`  ${symbols.warning} Could not fetch ticket: ${msg}`));
-      ticketId = null;
+    const ticketsProvider = await registry.tickets().catch(() => null);
+    if (ticketsProvider) {
+      try {
+        const ticket = await fetchTicket(ticketsProvider, ticketId);
+        ticketTitle = ticket.title;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(theme.warning(`  ${symbols.warning} Could not fetch ticket: ${msg}`));
+        ticketId = null;
+      }
     }
   }
 

@@ -1,4 +1,6 @@
 export class MorgError extends Error {
+  exitCode = 1;
+
   constructor(
     message: string,
     public readonly fix?: string,
@@ -9,6 +11,8 @@ export class MorgError extends Error {
 }
 
 export class ConfigError extends MorgError {
+  override exitCode = 5;
+
   constructor(message: string, fix?: string) {
     super(message, fix);
     this.name = 'ConfigError';
@@ -16,6 +20,8 @@ export class ConfigError extends MorgError {
 }
 
 export class IntegrationError extends MorgError {
+  override exitCode = 3;
+
   constructor(
     message: string,
     public readonly integration: string,
@@ -27,6 +33,8 @@ export class IntegrationError extends MorgError {
 }
 
 export class GitError extends MorgError {
+  override exitCode = 4;
+
   constructor(message: string, fix?: string) {
     super(message, fix);
     this.name = 'GitError';
@@ -39,6 +47,7 @@ export function handleError(err: unknown): never {
     if (err.fix) {
       console.error(`Fix: ${err.fix}`);
     }
+    process.exit(err.exitCode);
   } else if (err instanceof Error) {
     console.error(`\nUnexpected error: ${err.message}`);
   } else {
