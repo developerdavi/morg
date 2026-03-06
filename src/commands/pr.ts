@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { execa } from 'execa';
 import { configManager } from '../config/manager';
 import { getCurrentBranch, getDiffWithBase, pushBranch, getCommitsOnBranch } from '../git/index';
-import { ghClient, ghPrToPrStatus } from '../integrations/github/client';
+import { GhClient, ghClient, ghPrToPrStatus } from '../integrations/github/client';
 import { ClaudeClient } from '../integrations/claude/client';
 import {
   prDescriptionPrompt,
@@ -30,6 +30,7 @@ async function runPrCreate(options: {
     configManager.getProjectConfig(projectId),
   ]);
   const defaultBranch = projectConfig.defaultBranch;
+  const gh = new GhClient(projectConfig.githubUsername);
 
   const [branchesFile, commits] = await Promise.all([
     configManager.getBranches(projectId),
@@ -95,7 +96,7 @@ async function runPrCreate(options: {
   await withSpinner(`Pushing ${currentBranch}...`, () => pushBranch(currentBranch));
 
   const pr = await withSpinner('Creating PR...', () =>
-    ghClient.createPR({ title, body, base: defaultBranch, draft: options.draft }),
+    gh.createPR({ title, body, base: defaultBranch, draft: options.draft }),
   );
 
   if (trackedBranch) {
@@ -150,9 +151,12 @@ async function runPrReview(options: { ai?: boolean }): Promise<void> {
 
 async function runPrView(options: { web?: boolean }): Promise<void> {
   const branch = await getCurrentBranch();
-  const pr = await withSpinner(`Fetching PR for ${branch}...`, () =>
-    ghClient.getPRForBranch(branch),
-  );
+  const projectId = await requireTrackedRepo().catch(() => undefined);
+  const projectConfig = projectId
+    ? await configManager.getProjectConfig(projectId).catch(() => undefined)
+    : undefined;
+  const gh = new GhClient(projectConfig?.githubUsername);
+  const pr = await withSpinner(`Fetching PR for ${branch}...`, () => gh.getPRForBranch(branch));
 
   if (!pr) {
     console.log(theme.muted(`No PR found for branch "${branch}".`));

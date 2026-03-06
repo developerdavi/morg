@@ -80,6 +80,12 @@ async function runInit(): Promise<void> {
     validate: (v) => (v.includes('/') ? undefined : 'Format: owner/repo'),
   });
 
+  const githubUsername = await text({
+    message: 'GitHub username for this project (used for gh CLI auth)',
+    initialValue: existingProjectConfig?.githubUsername ?? globalConfig.githubUsername,
+    validate: (v) => (v.trim() ? undefined : 'Required'),
+  });
+
   const detectedBranch = await getDefaultBranch();
   const defaultBranch = await text({
     message: 'Default branch (used as PR base and branch creation base)',
@@ -135,7 +141,7 @@ async function runInit(): Promise<void> {
   await configManager.saveProjectConfig(projectId, {
     version: 1,
     projectId,
-    githubUsername: globalConfig.githubUsername,
+    githubUsername,
     githubRepo,
     defaultBranch,
     integrations: {

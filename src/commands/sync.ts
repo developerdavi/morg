@@ -1,7 +1,7 @@
 import { execa } from 'execa';
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import { ghClient, ghPrToPrStatus } from '../integrations/github/client';
+import { GhClient, ghPrToPrStatus } from '../integrations/github/client';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
@@ -32,6 +32,7 @@ async function runSync(options: { all?: boolean }): Promise<void> {
     configManager.getProjectConfig(projectId),
   ]);
   const { defaultBranch } = projectConfig;
+  const gh = new GhClient(projectConfig.githubUsername);
   const autoDeleteMerged = projectConfig.autoDeleteMerged ?? globalConfig.autoDeleteMerged;
   const autoUpdateTicketStatus =
     projectConfig.autoUpdateTicketStatus ?? globalConfig.autoUpdateTicketStatus;
@@ -55,7 +56,7 @@ async function runSync(options: { all?: boolean }): Promise<void> {
   let updated = 0;
   for (const branch of syncableBranches) {
     const pr = await withSpinner(`Checking ${branch.branchName}...`, () =>
-      ghClient.getPRForBranch(branch.branchName),
+      gh.getPRForBranch(branch.branchName),
     );
     if (!pr) continue;
 
