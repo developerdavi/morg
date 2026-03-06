@@ -14,6 +14,7 @@ import {
   rebaseBranch,
   mergeBranch,
   deleteBranch,
+  removeWorktree,
 } from '../git/index';
 
 async function hasDiverged(branch: string, defaultBranch: string): Promise<boolean> {
@@ -107,6 +108,15 @@ async function runSync(options: { all?: boolean }): Promise<void> {
       const currentBranch = await getCurrentBranch();
       if (currentBranch === branch.branchName) {
         await checkout(defaultBranch);
+      }
+      // Remove worktree first so git allows the branch to be deleted
+      if (branch.worktreePath) {
+        try {
+          await removeWorktree(branch.worktreePath);
+          branch.worktreePath = null;
+        } catch {
+          // Worktree may already be gone; proceed to branch deletion
+        }
       }
       try {
         await deleteBranch(branch.branchName);
