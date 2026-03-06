@@ -136,7 +136,7 @@ describe('registry', () => {
   describe('gh()', () => {
     it('returns a GhClient instance', async () => {
       const { registry } = await import('../../src/services/registry');
-      const { GhClient } = await import('../../src/integrations/github/client');
+      const { GhClient } = await import('../../src/integrations/providers/github/github-client');
       const client = await registry.gh();
       expect(client).toBeInstanceOf(GhClient);
     });

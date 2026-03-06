@@ -1,7 +1,7 @@
 import { execa } from 'execa';
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import { ghPrToPrStatus } from '../integrations/github/client';
+import { ghPrToPrStatus } from '../integrations/providers/github/github-client';
 import { requireTrackedRepo } from '../utils/detect';
 import { registry } from '../services/registry';
 import { theme, symbols } from '../ui/theme';

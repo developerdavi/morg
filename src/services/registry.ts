@@ -1,6 +1,6 @@
 import { configManager } from '../config/manager';
 import { requireTrackedRepo } from '../utils/detect';
-import { GhClient } from '../integrations/github/client';
+import { GhClient } from '../integrations/providers/github/github-client';
 import { JiraClient } from '../integrations/providers/tickets/implementations/jira-tickets-provider';
 import { NotionClient } from '../integrations/providers/tickets/implementations/notion-tickets-provider';
 import { ClaudeClient } from '../integrations/providers/ai/implementations/claude-ai-provider';

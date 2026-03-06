@@ -1,7 +1,7 @@
 import { execa } from 'execa';
 import { z } from 'zod';
-import type { PrStatus } from '../../config/schemas';
-import { IntegrationError } from '../../utils/errors';
+import type { PrStatus } from '../../../config/schemas';
+import { IntegrationError } from '../../../utils/errors';
 
 const GhPrSchema = z.object({
   number: z.number(),

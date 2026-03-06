@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { execa } from 'execa';
-import { GhClient, ghPrToPrStatus } from '../../src/integrations/github/client';
+import { GhClient, ghPrToPrStatus } from '../../src/integrations/providers/github/github-client';
 
 vi.mock('execa');
 

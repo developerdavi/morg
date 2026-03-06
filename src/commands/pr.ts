@@ -2,13 +2,13 @@ import type { Command } from 'commander';
 import { execa } from 'execa';
 import { configManager } from '../config/manager';
 import { getCurrentBranch, getDiffWithBase, pushBranch, getCommitsOnBranch } from '../git/index';
-import { ghClient, ghPrToPrStatus } from '../integrations/github/client';
+import { ghClient, ghPrToPrStatus } from '../integrations/providers/github/github-client';
 import {
   prDescriptionPrompt,
   SYSTEM_PR_DESCRIPTION,
   prReviewPrompt,
   SYSTEM_PR_REVIEW,
-} from '../integrations/claude/prompts';
+} from '../integrations/providers/ai/prompts';
 import { requireTrackedRepo } from '../utils/detect';
 import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';

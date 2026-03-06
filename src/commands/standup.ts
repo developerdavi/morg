@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
 import { getRecentCommits } from '../git/index';
-import { standupPrompt, SYSTEM_STANDUP } from '../integrations/claude/prompts';
+import { standupPrompt, SYSTEM_STANDUP } from '../integrations/providers/ai/prompts';
 import { requireTrackedRepo } from '../utils/detect';
 import { registry } from '../services/registry';
 import { theme, symbols } from '../ui/theme';
