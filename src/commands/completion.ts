@@ -73,8 +73,7 @@ complete -F _morg_completion morg`;
 
 function generateZshCompletion(commands: string[]): string {
   const commandDefs = commands.map((c) => `  '${c}'`).join('\n');
-  return `#compdef morg
-# morg zsh completion
+  return `# morg zsh completion
 # Add to ~/.zshrc: eval "$(morg completion zsh)"
 
 _morg() {
@@ -105,9 +104,24 @@ ${commandDefs}
           _describe 'subcommand' subcmds
           ;;
         config)
-          local -a subcmds
-          subcmds=('--show' 'profile')
-          _describe 'subcommand' subcmds
+          case \$words[3] in
+            profile)
+              case \$words[4] in
+                create|use|list)
+                  ;;
+                *)
+                  local -a profcmds
+                  profcmds=('list' 'create' 'use')
+                  _describe 'subcommand' profcmds
+                  ;;
+              esac
+              ;;
+            *)
+              local -a subcmds
+              subcmds=('--show' 'profile')
+              _describe 'subcommand' subcmds
+              ;;
+          esac
           ;;
         completion)
           local -a shells
@@ -128,7 +142,7 @@ ${commandDefs}
   esac
 }
 
-_morg "\$@"`;
+compdef _morg morg`;
 }
 
 function runCompletion(shell: string): void {
