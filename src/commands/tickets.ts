@@ -108,13 +108,14 @@ async function runTicketActions(
 async function runTickets(
   ticketId: string | undefined,
   options: { plain?: boolean },
+  resolveFromBranch = false,
 ): Promise<void> {
   const projectId = await requireTrackedRepo();
   const plain = options.plain ?? false;
 
-  // Resolve ticket ID: from arg, or from current branch's tracked ticket
+  // Resolve ticket ID: from arg, or (only for `ticket` singular) from current branch
   let resolvedId = ticketId?.toUpperCase();
-  if (!resolvedId) {
+  if (!resolvedId && resolveFromBranch) {
     const [branchesFile, currentBranch] = await Promise.all([
       configManager.getBranches(projectId),
       getCurrentBranch(),
@@ -186,10 +187,21 @@ async function runTickets(
 }
 
 export function registerTicketsCommand(program: Command): void {
+  // `morg tickets [id]` — always lists if no id given
   program
     .command('tickets [id]')
-    .alias('ticket')
-    .description('Show details for a ticket (defaults to current branch ticket)')
+    .description('List all tickets, or show detail for a specific ticket')
     .option('--plain', 'Output list/detail without interactive prompts (for scripts/pipes)')
-    .action(runTickets);
+    .action((id: string | undefined, options: { plain?: boolean }) =>
+      runTickets(id, options, false),
+    );
+
+  // `morg ticket [id]` — resolves to current branch ticket if no id given
+  program
+    .command('ticket [id]')
+    .description('Show ticket details (defaults to current branch ticket)')
+    .option('--plain', 'Output without interactive prompts (for scripts/pipes)')
+    .action((id: string | undefined, options: { plain?: boolean }) =>
+      runTickets(id, options, true),
+    );
 }
