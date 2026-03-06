@@ -1,6 +1,6 @@
 import { execa } from 'execa';
 import { configManager } from '../config/manager';
-import { getRepoRoot } from '../git/index';
+import { getMainWorktreeRoot } from '../git/index';
 import { ConfigError } from './errors';
 
 export async function requireConfig(): Promise<void> {
@@ -9,7 +9,7 @@ export async function requireConfig(): Promise<void> {
 }
 
 export async function requireTrackedRepo(): Promise<string> {
-  const root = await getRepoRoot();
+  const root = await getMainWorktreeRoot();
   const projects = await configManager.getProjects();
   const project = projects.projects.find((p) => p.path === root);
   if (!project) {

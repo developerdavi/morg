@@ -1,3 +1,4 @@
+import path from 'path';
 import { execa } from 'execa';
 import { GitError } from '../utils/errors';
 
@@ -7,6 +8,25 @@ export async function getRepoRoot(): Promise<string> {
     throw new GitError('Not inside a git repository.', 'Run git init or cd into a repo.');
   }
   return result.stdout.trim();
+}
+
+/**
+ * Returns the main worktree root, even when called from a linked worktree.
+ * Uses `git rev-parse --git-common-dir` to find the shared git directory,
+ * then resolves the main repo root from it.
+ */
+export async function getMainWorktreeRoot(): Promise<string> {
+  const commonDirResult = await execa('git', ['rev-parse', '--git-common-dir'], { reject: false });
+  if (commonDirResult.exitCode !== 0) {
+    throw new GitError('Not inside a git repository.', 'Run git init or cd into a repo.');
+  }
+  const commonDir = commonDirResult.stdout.trim();
+  // If absolute, we're in a linked worktree — the main root is the parent of the .git dir
+  if (path.isAbsolute(commonDir)) {
+    return path.dirname(commonDir);
+  }
+  // Otherwise we're in the main worktree — use --show-toplevel
+  return getRepoRoot();
 }
 
 export async function getCurrentBranch(): Promise<string> {
