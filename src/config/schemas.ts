@@ -94,11 +94,12 @@ export const ProjectIntegrationsSchema = z.object({
 export const ProjectConfigSchema = z.object({
   version: z.literal(1),
   projectId: z.string().min(1),
-  githubUsername: z.string().min(1),
+  githubUsername: z.string().min(1).optional(), // kept optional for backward compat; use global config
   githubRepo: z.string().min(1),
   defaultBranch: z.string().min(1).default('main'),
   autoDeleteMerged: z.enum(['always', 'ask', 'never']).optional(),
   autoUpdateTicketStatus: z.enum(['always', 'ask', 'never']).optional(),
+  profile: z.string().optional(),
   integrations: ProjectIntegrationsSchema.default({}),
 });
 

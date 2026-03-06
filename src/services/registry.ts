@@ -19,14 +19,16 @@ class Registry {
   }
 
   async gh(): Promise<GhClient> {
-    const projectConfig = await configManager.getProjectConfig(await this.pid());
-    return new GhClient(projectConfig.githubUsername);
+    const pid = await this.pid();
+    const globalConfig = await configManager.getGlobalConfig(pid);
+    return new GhClient(globalConfig.githubUsername);
   }
 
   async tickets(): Promise<TicketsProvider | null> {
+    const pid = await this.pid();
     const [globalConfig, projectConfig] = await Promise.all([
-      configManager.getGlobalConfig(),
-      configManager.getProjectConfig(await this.pid()),
+      configManager.getGlobalConfig(pid),
+      configManager.getProjectConfig(pid),
     ]);
     if (globalConfig.integrations.jira?.enabled && projectConfig.integrations.jira?.enabled) {
       return new JiraClient(globalConfig.integrations.jira, projectConfig.integrations.jira);
@@ -38,12 +40,12 @@ class Registry {
   }
 
   async ai(): Promise<AIProvider | null> {
-    const globalConfig = await configManager.getGlobalConfig();
+    const globalConfig = await configManager.getGlobalConfig(await this.pid());
     return globalConfig.anthropicApiKey ? new ClaudeClient(globalConfig.anthropicApiKey) : null;
   }
 
   async messaging(): Promise<MessagingProvider | null> {
-    const globalConfig = await configManager.getGlobalConfig();
+    const globalConfig = await configManager.getGlobalConfig(await this.pid());
     return globalConfig.integrations.slack?.enabled
       ? new SlackClient(globalConfig.integrations.slack)
       : null;

@@ -91,21 +91,15 @@ export class GhClient {
     return result.stdout;
   }
 
-  async getPRChecks(
-    prNumber: number,
-  ): Promise<{ name: string; state: string; conclusion: string | null }[]> {
+  async getPRChecks(prNumber: number): Promise<{ name: string; state: string; bucket: string }[]> {
     const result = await execa(
       'gh',
-      ['pr', 'checks', String(prNumber), '--json', 'name,state,conclusion'],
+      ['pr', 'checks', String(prNumber), '--json', 'name,state,bucket'],
       { reject: false, env: await this.ghEnv() },
     );
     if (result.exitCode !== 0 || !result.stdout.trim()) return [];
     try {
-      return JSON.parse(result.stdout) as {
-        name: string;
-        state: string;
-        conclusion: string | null;
-      }[];
+      return JSON.parse(result.stdout) as { name: string; state: string; bucket: string }[];
     } catch {
       return [];
     }

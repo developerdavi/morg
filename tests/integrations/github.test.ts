@@ -71,8 +71,8 @@ describe('GhClient', () => {
   describe('getPRChecks', () => {
     it('returns checks array on success', async () => {
       const checksPayload = [
-        { name: 'CI', state: 'COMPLETED', conclusion: 'SUCCESS' },
-        { name: 'Lint', state: 'COMPLETED', conclusion: 'SUCCESS' },
+        { name: 'CI', state: 'SUCCESS', bucket: 'pass' },
+        { name: 'Lint', state: 'SUCCESS', bucket: 'pass' },
       ];
       mockExeca.mockResolvedValueOnce({ exitCode: 0, stdout: '' }); // ghEnv
       mockExeca.mockResolvedValueOnce({
@@ -84,7 +84,7 @@ describe('GhClient', () => {
       const checks = await client.getPRChecks(42);
 
       expect(checks).toHaveLength(2);
-      expect(checks[0]?.conclusion).toBe('SUCCESS');
+      expect(checks[0]?.bucket).toBe('pass');
     });
 
     it('returns empty array when gh command fails', async () => {

@@ -71,9 +71,9 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
       try {
         const checks = await gh.getPRChecks(pr.number);
         if (checks.length > 0) {
-          const passing = checks.filter((c) => c.conclusion?.toUpperCase() === 'SUCCESS').length;
-          const failing = checks.filter((c) => c.conclusion?.toUpperCase() === 'FAILURE').length;
-          const pending = checks.filter((c) => !c.conclusion && c.state !== 'COMPLETED').length;
+          const passing = checks.filter((c) => c.bucket === 'pass').length;
+          const failing = checks.filter((c) => c.bucket === 'fail').length;
+          const pending = checks.filter((c) => c.bucket !== 'pass' && c.bucket !== 'fail').length;
           let ciLine = `${theme.muted('  CI:')}     `;
           if (failing > 0) {
             ciLine += theme.error(`✗ ${failing}/${checks.length} failing`);

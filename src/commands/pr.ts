@@ -210,9 +210,9 @@ async function runPrView(
   try {
     const checks = await gh.getPRChecks(pr.number);
     if (checks.length > 0) {
-      const passing = checks.filter((c) => c.conclusion?.toUpperCase() === 'SUCCESS').length;
-      const failing = checks.filter((c) => c.conclusion?.toUpperCase() === 'FAILURE').length;
-      const pending = checks.filter((c) => !c.conclusion && c.state !== 'COMPLETED').length;
+      const passing = checks.filter((c) => c.bucket === 'pass').length;
+      const failing = checks.filter((c) => c.bucket === 'fail').length;
+      const pending = checks.filter((c) => c.bucket !== 'pass' && c.bucket !== 'fail').length;
       let ciLine = `  ${theme.muted('CI:')}     `;
       if (failing > 0) {
         ciLine += theme.error(`✗ ${failing}/${checks.length} failing`);
@@ -246,11 +246,11 @@ async function runPrView(
         process.stdout.write('.');
         continue;
       }
-      if (checks.every((c) => c.conclusion?.toUpperCase() === 'SUCCESS')) {
+      if (checks.every((c) => c.bucket === 'pass')) {
         console.log('\n' + theme.success(`  ${symbols.success} All checks passed`));
         return;
       }
-      if (checks.some((c) => c.conclusion?.toUpperCase() === 'FAILURE')) {
+      if (checks.some((c) => c.bucket === 'fail')) {
         console.log('\n' + theme.error(`  ${symbols.error ?? symbols.warning} A check failed`));
         process.exit(1);
       }

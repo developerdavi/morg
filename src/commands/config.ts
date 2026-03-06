@@ -3,49 +3,9 @@ import { configManager } from '../config/manager';
 import type { GlobalConfig } from '../config/schemas';
 import { theme, symbols } from '../ui/theme';
 import { intro, outro, text, password, confirm, select } from '../ui/prompts';
+import { requireTrackedRepo } from '../utils/detect';
 
-async function runConfig(options: { show?: boolean }): Promise<void> {
-  if (options.show) {
-    if (!(await configManager.hasGlobalConfig())) {
-      console.log(theme.error('No config found.'), theme.muted('Run: morg config'));
-      return;
-    }
-    const config = await configManager.getGlobalConfig();
-    const redact = (s: string) => s.slice(0, 8) + '••••••••';
-    console.log(theme.primaryBold('\nmorg config'));
-    console.log(theme.muted('─'.repeat(40)));
-    console.log(`  githubUsername:  ${theme.primary(config.githubUsername)}`);
-    if (config.anthropicApiKey)
-      console.log(`  anthropicApiKey: ${theme.muted(redact(config.anthropicApiKey))}`);
-    console.log(`  autoStash:            ${theme.primary(config.autoStash)}`);
-    console.log(`  autoDeleteMerged:     ${theme.primary(config.autoDeleteMerged)}`);
-    console.log(`  autoUpdateTicketStatus: ${theme.primary(config.autoUpdateTicketStatus)}`);
-    if (config.integrations.jira?.enabled) {
-      const j = config.integrations.jira;
-      console.log(`  jira.baseUrl:    ${theme.primary(j.baseUrl)}`);
-      console.log(`  jira.userEmail:  ${theme.primary(j.userEmail)}`);
-      console.log(`  jira.apiToken:   ${theme.muted(redact(j.apiToken))}`);
-    }
-    if (config.integrations.slack?.enabled) {
-      const s = config.integrations.slack;
-      console.log(`  slack.apiToken:       ${theme.muted(redact(s.apiToken))}`);
-      if (s.standupChannel)
-        console.log(`  slack.standupChannel: ${theme.primary(s.standupChannel)}`);
-    }
-    if (config.integrations.notion?.enabled) {
-      const n = config.integrations.notion;
-      console.log(`  notion.apiToken:  ${theme.muted(redact(n.apiToken))}`);
-    }
-    console.log('');
-    return;
-  }
-
-  intro(theme.primaryBold('morg config'));
-
-  const existing = (await configManager.hasGlobalConfig())
-    ? await configManager.getGlobalConfig()
-    : undefined;
-
+async function runConfigWizard(existing: GlobalConfig | undefined): Promise<GlobalConfig> {
   const githubUsername = await text({
     message: 'GitHub username',
     initialValue: existing?.githubUsername,
@@ -160,7 +120,7 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     notionConfig = { enabled: true, apiToken };
   }
 
-  await configManager.saveGlobalConfig({
+  return {
     version: 1,
     githubUsername,
     anthropicApiKey,
@@ -169,7 +129,69 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     autoDeleteMerged,
     autoUpdateTicketStatus,
     integrations: { jira: jiraConfig, slack: slackConfig, notion: notionConfig },
-  });
+  };
+}
+
+async function runConfig(options: { show?: boolean }): Promise<void> {
+  if (options.show) {
+    if (!(await configManager.hasGlobalConfig())) {
+      console.log(theme.error('No config found.'), theme.muted('Run: morg config'));
+      return;
+    }
+    const redact = (s: string) => s.slice(0, 8) + '••••••••';
+    const envProfile = process.env.MORG_PROFILE;
+    const projectId = await requireTrackedRepo().catch(() => undefined);
+    const projectConfig = projectId
+      ? await configManager.getProjectConfig(projectId).catch(() => undefined)
+      : undefined;
+    const projectProfile = projectConfig?.profile;
+    const config = await configManager.getGlobalConfig(projectId);
+    const globalProfile = config.activeProfile;
+    console.log(theme.primaryBold('\nmorg config'));
+    console.log(theme.muted('─'.repeat(40)));
+    if (envProfile) {
+      console.log(`  profile:         ${theme.success(envProfile)} ${theme.muted('(env)')}`);
+    } else if (projectProfile) {
+      console.log(
+        `  profile:         ${theme.success(projectProfile)} ${theme.muted('(project)')}`,
+      );
+    } else if (globalProfile) {
+      console.log(`  profile:         ${theme.success(globalProfile)} ${theme.muted('(global)')}`);
+    }
+    console.log(`  githubUsername:  ${theme.primary(config.githubUsername)}`);
+    if (config.anthropicApiKey)
+      console.log(`  anthropicApiKey: ${theme.muted(redact(config.anthropicApiKey))}`);
+    console.log(`  autoStash:            ${theme.primary(config.autoStash)}`);
+    console.log(`  autoDeleteMerged:     ${theme.primary(config.autoDeleteMerged)}`);
+    console.log(`  autoUpdateTicketStatus: ${theme.primary(config.autoUpdateTicketStatus)}`);
+    if (config.integrations.jira?.enabled) {
+      const j = config.integrations.jira;
+      console.log(`  jira.baseUrl:    ${theme.primary(j.baseUrl)}`);
+      console.log(`  jira.userEmail:  ${theme.primary(j.userEmail)}`);
+      console.log(`  jira.apiToken:   ${theme.muted(redact(j.apiToken))}`);
+    }
+    if (config.integrations.slack?.enabled) {
+      const s = config.integrations.slack;
+      console.log(`  slack.apiToken:       ${theme.muted(redact(s.apiToken))}`);
+      if (s.standupChannel)
+        console.log(`  slack.standupChannel: ${theme.primary(s.standupChannel)}`);
+    }
+    if (config.integrations.notion?.enabled) {
+      const n = config.integrations.notion;
+      console.log(`  notion.apiToken:  ${theme.muted(redact(n.apiToken))}`);
+    }
+    console.log('');
+    return;
+  }
+
+  intro(theme.primaryBold('morg config'));
+
+  const existing = (await configManager.hasGlobalConfig())
+    ? await configManager.getGlobalConfig()
+    : undefined;
+
+  const updated = await runConfigWizard(existing);
+  await configManager.saveGlobalConfig(updated);
 
   outro(theme.success(`${symbols.success} Config saved to ~/.morg/config.json`));
 }
@@ -182,6 +204,33 @@ export function registerConfigCommand(program: Command): void {
     .action((options: { show?: boolean }) => runConfig(options));
 
   const profile = config.command('profile').description('Manage configuration profiles');
+
+  profile
+    .command('current')
+    .description('Show the active profile')
+    .action(async () => {
+      if (process.env.MORG_PROFILE) {
+        console.log(theme.success(process.env.MORG_PROFILE) + theme.muted(' (env)'));
+        return;
+      }
+      const projectId = await requireTrackedRepo().catch(() => undefined);
+      if (projectId) {
+        const projectConfig = await configManager
+          .getProjectConfig(projectId)
+          .catch(() => undefined);
+        if (projectConfig?.profile) {
+          console.log(theme.success(projectConfig.profile) + theme.muted(' (project)'));
+          return;
+        }
+      }
+      const globalProfile = (await configManager.getGlobalConfig().catch(() => null))
+        ?.activeProfile;
+      if (globalProfile) {
+        console.log(theme.success(globalProfile) + theme.muted(' (global)'));
+      } else {
+        console.log(theme.muted('none (using base config)'));
+      }
+    });
 
   profile
     .command('list')
@@ -219,17 +268,42 @@ export function registerConfigCommand(program: Command): void {
     });
 
   profile
-    .command('use <name>')
-    .description('Activate a named profile (sets activeProfile)')
+    .command('edit <name>')
+    .description('Edit an existing profile with the interactive wizard')
     .action(async (name: string) => {
       const profiles = await configManager.listProfiles();
       if (!profiles.includes(name)) {
         console.error(theme.error(`Profile "${name}" not found. Run: morg config profile list`));
         process.exit(1);
       }
-      const config = await configManager.getGlobalConfig();
-      config.activeProfile = name;
-      await configManager.saveGlobalConfig(config);
-      console.log(theme.success(`${symbols.success} Switched to profile "${name}"`));
+      intro(theme.primaryBold(`morg config profile edit ${name}`));
+      const existing = await configManager.getProfileConfig(name);
+      const updated = await runConfigWizard(existing);
+      await configManager.saveProfileConfig(name, updated);
+      outro(theme.success(`${symbols.success} Profile "${name}" updated`));
+    });
+
+  profile
+    .command('use <name>')
+    .description('Activate a named profile globally, or for the current project with --project')
+    .option('--project', 'Set profile for the current project only')
+    .action(async (name: string, options: { project?: boolean }) => {
+      const profiles = await configManager.listProfiles();
+      if (!profiles.includes(name)) {
+        console.error(theme.error(`Profile "${name}" not found. Run: morg config profile list`));
+        process.exit(1);
+      }
+      if (options.project) {
+        const projectId = await requireTrackedRepo();
+        const projectConfig = await configManager.getProjectConfig(projectId);
+        projectConfig.profile = name;
+        await configManager.saveProjectConfig(projectId, projectConfig);
+        console.log(theme.success(`${symbols.success} Project profile set to "${name}"`));
+      } else {
+        const config = await configManager.getGlobalConfig();
+        config.activeProfile = name;
+        await configManager.saveGlobalConfig(config);
+        console.log(theme.success(`${symbols.success} Switched to profile "${name}" globally`));
+      }
     });
 }

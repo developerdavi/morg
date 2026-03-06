@@ -47,7 +47,7 @@ _morg_completion() {
       COMPREPLY=( $(compgen -W "--show profile" -- "\${cur}") )
       ;;
     profile)
-      COMPREPLY=( $(compgen -W "list create use" -- "\${cur}") )
+      COMPREPLY=( $(compgen -W "current list create edit use" -- "\${cur}") )
       ;;
     completion)
       COMPREPLY=( $(compgen -W "bash zsh" -- "\${cur}") )
@@ -107,11 +107,11 @@ ${commandDefs}
           case \$words[3] in
             profile)
               case \$words[4] in
-                create|use|list)
+                current|create|edit|use|list)
                   ;;
                 *)
                   local -a profcmds
-                  profcmds=('list' 'create' 'use')
+                  profcmds=('current' 'list' 'create' 'edit' 'use')
                   _describe 'subcommand' profcmds
                   ;;
               esac

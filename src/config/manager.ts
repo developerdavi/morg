@@ -43,7 +43,7 @@ async function writeJson(path: string, data: unknown): Promise<void> {
 }
 
 class ConfigManager {
-  async getGlobalConfig(): Promise<GlobalConfig> {
+  async getGlobalConfig(projectId?: string): Promise<GlobalConfig> {
     let raw: GlobalConfig;
     try {
       raw = await readJson(CONFIG_FILE, GlobalConfigSchema);
@@ -51,8 +51,20 @@ class ConfigManager {
       throw new ConfigError('morg is not configured.', 'Run: morg config');
     }
 
-    // Apply profile overlay: env var takes precedence over activeProfile field
-    const profileName = process.env.MORG_PROFILE ?? raw.activeProfile;
+    // Profile resolution priority: MORG_PROFILE env > project profile > global activeProfile
+    let profileName = process.env.MORG_PROFILE;
+    if (!profileName && projectId) {
+      const projectPath = projectConfigFile(projectId);
+      if (existsSync(projectPath)) {
+        try {
+          const projectConfig = await readJson(projectPath, ProjectConfigSchema);
+          profileName = projectConfig.profile;
+        } catch {
+          // ignore
+        }
+      }
+    }
+    profileName = profileName ?? raw.activeProfile;
     if (!profileName) return raw;
 
     const profilePath = profileConfigFile(profileName);
@@ -73,6 +85,14 @@ class ConfigManager {
 
   async saveGlobalConfig(config: GlobalConfig): Promise<void> {
     await writeJson(CONFIG_FILE, config);
+  }
+
+  async getProfileConfig(name: string): Promise<GlobalConfig> {
+    try {
+      return await readJson(profileConfigFile(name), GlobalConfigSchema);
+    } catch {
+      throw new ConfigError(`Profile "${name}" not found.`);
+    }
   }
 
   async saveProfileConfig(name: string, config: GlobalConfig): Promise<void> {
