@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { execa } from 'execa';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, checkout, removeWorktree } from '../git/index';
+import { getCurrentBranch, checkout, removeWorktree, branchExists } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
 import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
@@ -56,12 +56,14 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
     await withSpinner('Removing worktree...', () => removeWorktree(trackedBranch.worktreePath!));
   }
 
-  // Delete the branch (-D to force if requested, -d otherwise)
-  const deleteFlag = options.force ? '-D' : '-d';
-  const result = await execa('git', ['branch', deleteFlag, targetBranch], { reject: false });
-  if (result.exitCode !== 0) {
-    console.error(theme.error(`Failed to delete branch: ${result.stderr}`));
-    process.exit(1);
+  // Delete the branch — skip if already gone from git (e.g. worktree was removed externally)
+  if (await branchExists(targetBranch)) {
+    const deleteFlag = options.force ? '-D' : '-d';
+    const result = await execa('git', ['branch', deleteFlag, targetBranch], { reject: false });
+    if (result.exitCode !== 0) {
+      console.error(theme.error(`Failed to delete branch: ${result.stderr}`));
+      process.exit(1);
+    }
   }
 
   // Remove branch entry from registry
