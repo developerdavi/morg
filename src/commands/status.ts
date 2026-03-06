@@ -17,6 +17,13 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
   ]);
 
   const trackedBranch = findBranchCaseInsensitive(branchesFile.branches, targetBranch);
+
+  // Don't fetch details for untracked branches — show the all-branches table instead
+  if (!trackedBranch) {
+    await renderStatus();
+    return;
+  }
+
   const defaultBranch = projectConfig.defaultBranch;
 
   const [ticketResult, prResult, commitsResult, diffResult] = await Promise.allSettled([
