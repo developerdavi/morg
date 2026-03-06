@@ -36,8 +36,9 @@ export async function runStart(
     try {
       const ticket = await fetchTicket(projectId, ticketId);
       ticketTitle = ticket.title;
-    } catch {
-      // no provider or fetch failed — proceed without title
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(theme.warning(`  ${symbols.warning} Could not fetch ticket: ${msg}`));
     }
   } else {
     branchName = input;
@@ -71,8 +72,9 @@ export async function runStart(
       if (currentBranch === base) {
         try {
           await withSpinner(`Pulling ${base}...`, () => pullBranch(base));
-        } catch {
-          console.log(theme.warning(`  ${symbols.warning} Could not pull ${base} — using local`));
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.log(theme.warning(`  ${symbols.warning} Could not pull ${base}: ${msg}`));
         }
       } else {
         const updated = await fetchAndUpdateBranch(base);

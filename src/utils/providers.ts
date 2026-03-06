@@ -106,10 +106,9 @@ export async function promptTicketDone(
       provider.transitionTicket(ticketId, doneStatus),
     );
     console.log(theme.success(`  ${symbols.success} Ticket ${ticketId} marked as "${doneStatus}"`));
-  } catch {
-    console.log(
-      theme.warning(`  ${symbols.warning} Could not update ticket ${ticketId} — skipping`),
-    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(theme.warning(`  ${symbols.warning} Could not update ticket ${ticketId}: ${msg}`));
   }
 }
 
@@ -176,9 +175,8 @@ export async function promptTicketInProgress(
     console.log(
       theme.success(`  ${symbols.success} Ticket ${ticketId} marked as "${inProgressStatus}"`),
     );
-  } catch {
-    console.log(
-      theme.warning(`  ${symbols.warning} Could not update ticket ${ticketId} — skipping`),
-    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(theme.warning(`  ${symbols.warning} Could not update ticket ${ticketId}: ${msg}`));
   }
 }
