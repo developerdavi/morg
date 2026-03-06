@@ -70,8 +70,11 @@ async function runPrCreate(options: {
             SYSTEM_PR_DESCRIPTION,
           ),
         );
-      } catch {
-        // Best-effort — proceed with empty body
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(
+          theme.warning(`  ${symbols.warning} Could not generate AI description: ${msg}`),
+        );
       }
     }
   }
@@ -141,8 +144,13 @@ async function runPrReview(options: { ai?: boolean }): Promise<void> {
           claude.complete(prReviewPrompt(diff, pr.title), SYSTEM_PR_REVIEW),
         );
         console.log(theme.muted(`\n  ${symbols.info} ${summary.replace(/\n/g, '\n  ')}`));
-      } catch {
-        // Best-effort — skip AI summary for this PR
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(
+          theme.warning(
+            `  ${symbols.warning} Could not generate AI summary for #${pr.number}: ${msg}`,
+          ),
+        );
       }
     }
   }

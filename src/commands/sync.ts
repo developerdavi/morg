@@ -103,9 +103,10 @@ async function runSync(options: { all?: boolean }): Promise<void> {
       try {
         await deleteBranch(branch.branchName);
         console.log(theme.success(`  ${symbols.success} Deleted branch ${branch.branchName}`));
-      } catch {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
         console.log(
-          theme.warning(`  ${symbols.warning} Could not delete ${branch.branchName} — skipping`),
+          theme.warning(`  ${symbols.warning} Could not delete ${branch.branchName}: ${msg}`),
         );
       }
       branch.status = 'done';
@@ -155,11 +156,10 @@ async function runSync(options: { all?: boolean }): Promise<void> {
           theme.success(`  ${symbols.success} Merged ${defaultBranch} into ${branch.branchName}`),
         );
       }
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.log(
-        theme.warning(
-          `  ${symbols.warning} ${action} failed for ${branch.branchName} — resolve conflicts manually`,
-        ),
+        theme.warning(`  ${symbols.warning} ${action} failed for ${branch.branchName}: ${msg}`),
       );
     }
 

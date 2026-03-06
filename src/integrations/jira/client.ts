@@ -118,23 +118,20 @@ export class JiraClient implements TicketsProvider {
   }
 
   async getStatuses(): Promise<string[]> {
-    try {
-      if (this.projectConfig?.projectKey) {
-        const res = await fetch(this.url(`/project/${this.projectConfig.projectKey}/statuses`), {
-          headers: this.headers,
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { statuses: { name: string }[] }[];
-          return [...new Set(data.flatMap((t) => t.statuses.map((s) => s.name)))];
-        }
+    if (this.projectConfig?.projectKey) {
+      const res = await fetch(this.url(`/project/${this.projectConfig.projectKey}/statuses`), {
+        headers: this.headers,
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { statuses: { name: string }[] }[];
+        return [...new Set(data.flatMap((t) => t.statuses.map((s) => s.name)))];
       }
-      const res = await fetch(this.url('/status'), { headers: this.headers });
-      if (!res.ok) return [];
-      const data = (await res.json()) as { name: string }[];
-      return data.map((s) => s.name);
-    } catch {
-      return [];
     }
+    const res = await fetch(this.url('/status'), { headers: this.headers });
+    if (!res.ok)
+      throw new IntegrationError(`Failed to fetch Jira statuses (${res.status})`, 'jira');
+    const data = (await res.json()) as { name: string }[];
+    return data.map((s) => s.name);
   }
 
   async transitionTicket(ticketId: string, transitionName: string): Promise<void> {
