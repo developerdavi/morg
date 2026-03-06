@@ -157,12 +157,28 @@ async function runPrReview(options: { ai?: boolean }): Promise<void> {
   console.log('');
 }
 
-async function runPrView(options: { web?: boolean }): Promise<void> {
-  const branch = await getCurrentBranch();
+async function runPrView(branchArg: string | undefined, options: { web?: boolean }): Promise<void> {
   const projectId = await requireTrackedRepo().catch(() => undefined);
   const projectConfig = projectId
     ? await configManager.getProjectConfig(projectId).catch(() => undefined)
     : undefined;
+
+  let branch: string;
+  if (branchArg) {
+    // Resolve via registry (handles ticket IDs and case-insensitive branch names)
+    if (projectId) {
+      const branchesFile = await configManager.getBranches(projectId).catch(() => undefined);
+      const found = branchesFile
+        ? findBranchCaseInsensitive(branchesFile.branches, branchArg)
+        : undefined;
+      branch = found?.branchName ?? branchArg;
+    } else {
+      branch = branchArg;
+    }
+  } else {
+    branch = await getCurrentBranch();
+  }
+
   const gh = new GhClient(projectConfig?.githubUsername);
   const pr = await withSpinner(`Fetching PR for ${branch}...`, () => gh.getPRForBranch(branch));
 
@@ -191,7 +207,7 @@ export function registerPrCommand(program: Command): void {
   const pr = program
     .command('pr')
     .description('Pull request commands')
-    .action(() => runPrView({}));
+    .action(() => runPrView(undefined, {}));
 
   pr.command('create')
     .description('Create a pull request for the current branch')
@@ -210,8 +226,8 @@ export function registerPrCommand(program: Command): void {
     .option('--ai', 'Include AI summaries')
     .action((options: { ai?: boolean }) => runPrReview(options));
 
-  pr.command('view')
-    .description('View the PR for the current branch')
+  pr.command('view [branch]')
+    .description('View the PR for the current branch (or a specified branch/ticket)')
     .option('--web', 'Open in browser')
-    .action((options: { web?: boolean }) => runPrView(options));
+    .action((branch: string | undefined, options: { web?: boolean }) => runPrView(branch, options));
 }
