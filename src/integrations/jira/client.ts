@@ -24,6 +24,19 @@ const JiraIssueSchema = z.object({
 
 export type JiraIssue = z.infer<typeof JiraIssueSchema>;
 
+/** Convert Atlassian Document Format (ADF) to plain text. */
+function adfToText(node: unknown): string {
+  if (!node || typeof node !== 'object') return '';
+  const n = node as { type?: string; text?: string; content?: unknown[] };
+  if (n.type === 'text') return n.text ?? '';
+  if (n.type === 'hardBreak') return '\n';
+  const children = n.content?.map(adfToText).join('') ?? '';
+  if (n.type === 'paragraph' || n.type === 'heading') return children + '\n';
+  if (n.type === 'listItem') return '• ' + children;
+  if (n.type === 'codeBlock') return children + '\n';
+  return children;
+}
+
 export class JiraClient implements TicketsProvider {
   constructor(
     private readonly config: JiraGlobalConfig,
@@ -60,6 +73,9 @@ export class JiraClient implements TicketsProvider {
 
   async getTicket(ticketId: string): Promise<Ticket> {
     const issue = await this.getIssue(ticketId);
+    const description = issue.fields.description
+      ? adfToText(issue.fields.description).trim() || undefined
+      : undefined;
     return {
       id: issue.key,
       key: issue.key,
@@ -69,6 +85,7 @@ export class JiraClient implements TicketsProvider {
       assignee: issue.fields.assignee
         ? { name: issue.fields.assignee.displayName, email: issue.fields.assignee.emailAddress }
         : null,
+      description,
     };
   }
 
