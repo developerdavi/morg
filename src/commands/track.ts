@@ -20,11 +20,17 @@ async function runTrack(branch?: string, ticket?: string): Promise<void> {
     ticketId = ticket?.toUpperCase() ?? null;
   }
 
-  // Fetch ticket info — integration must be configured and ticket must exist
+  // Fetch ticket info — non-fatal; if fetch fails, branch is tracked without a ticket link
   let ticketTitle: string | null = null;
   if (ticketId) {
-    const ticket = await fetchTicket(projectId, ticketId);
-    ticketTitle = ticket.title;
+    try {
+      const ticket = await fetchTicket(projectId, ticketId);
+      ticketTitle = ticket.title;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(theme.warning(`  ${symbols.warning} Could not fetch ticket: ${msg}`));
+      ticketId = null;
+    }
   }
 
   const branchesFile = await configManager.getBranches(projectId);

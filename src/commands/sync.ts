@@ -54,6 +54,7 @@ async function runSync(options: { all?: boolean }): Promise<void> {
   const syncableBranches = allBranches.filter((b) => ['active', 'pr_open'].includes(b.status));
 
   let updated = 0;
+  let discovered = 0;
   for (const branch of syncableBranches) {
     const pr = await withSpinner(`Checking ${branch.branchName}...`, () =>
       gh.getPRForBranch(branch.branchName),
@@ -62,21 +63,28 @@ async function runSync(options: { all?: boolean }): Promise<void> {
 
     const prStatus = ghPrToPrStatus(pr);
     const branchStatus = pr.mergedAt ? ('pr_merged' as const) : ('pr_open' as const);
+    const isNewlyDiscovered = branch.prNumber == null;
 
-    if (branch.prStatus !== prStatus || branch.status !== branchStatus) {
+    if (isNewlyDiscovered || branch.prStatus !== prStatus || branch.status !== branchStatus) {
       branch.prNumber = pr.number;
       branch.prUrl = pr.url;
       branch.prStatus = prStatus;
       branch.status = branchStatus;
       branch.updatedAt = new Date().toISOString();
-      updated++;
-      console.log(theme.success(`  ${symbols.success} ${branch.branchName} → ${prStatus}`));
+      if (isNewlyDiscovered) {
+        discovered++;
+        console.log(
+          theme.success(`  ${symbols.success} ${branch.branchName} → linked PR #${pr.number}`),
+        );
+      } else {
+        updated++;
+        console.log(theme.success(`  ${symbols.success} ${branch.branchName} → ${prStatus}`));
+      }
     }
   }
 
-  if (updated > 0) {
-    console.log(theme.success(`  Synced ${updated} PR status(es).`));
-  }
+  if (updated > 0) console.log(theme.success(`  Synced ${updated} PR status(es).`));
+  if (discovered > 0) console.log(theme.success(`  Discovered ${discovered} new PR(s).`));
 
   // ── Step 3: Delete merged branches (all tracked branches) ────────────────────
   const mergedBranches = allBranches.filter((b) => b.status === 'pr_merged');

@@ -97,10 +97,13 @@ export class JiraClient implements TicketsProvider {
     ]
       .filter(Boolean)
       .join(' AND ');
-    const res = await fetch(this.url(`/search?jql=${encodeURIComponent(jql)}&maxResults=50`), {
-      headers: this.headers,
-    });
-    if (!res.ok) throw new IntegrationError('Failed to list Jira issues', 'jira');
+    const res = await fetch(
+      this.url(`/issue/search?jql=${encodeURIComponent(jql)}&maxResults=50`),
+      {
+        headers: this.headers,
+      },
+    );
+    if (!res.ok) throw new IntegrationError(`Failed to list Jira issues (${res.status})`, 'jira');
     const data = (await res.json()) as { issues: unknown[] };
     return data.issues.map((raw) => {
       const issue = JiraIssueSchema.parse(raw);

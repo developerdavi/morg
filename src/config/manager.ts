@@ -11,6 +11,7 @@ import {
   type ProjectConfig,
   type ProjectsFile,
   type BranchesFile,
+  type Branch,
 } from './schemas';
 import {
   CONFIG_FILE,
@@ -90,8 +91,16 @@ class ConfigManager {
     return readJson(newPath, BranchesFileSchema, { version: 1, branches: [] });
   }
 
+  private pruneStale(branches: Branch[]): Branch[] {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return branches.filter(
+      (b) => !['done', 'abandoned'].includes(b.status) || new Date(b.updatedAt).getTime() > cutoff,
+    );
+  }
+
   async saveBranches(id: string, data: BranchesFile): Promise<void> {
-    await writeJson(projectBranchesFile(id), data);
+    const pruned = { ...data, branches: this.pruneStale(data.branches) };
+    await writeJson(projectBranchesFile(id), pruned);
   }
 }
 

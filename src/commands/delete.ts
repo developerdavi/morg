@@ -6,7 +6,6 @@ import { requireTrackedRepo } from '../utils/detect';
 import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
-import { confirm } from '../ui/prompts';
 
 async function hasUnmergedCommits(branch: string, defaultBranch: string): Promise<boolean> {
   const result = await execa('git', ['log', `${defaultBranch}..${branch}`, '--oneline'], {
@@ -47,12 +46,6 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
     process.exit(1);
   }
 
-  const ok = await confirm({ message: `Delete branch "${targetBranch}"?` });
-  if (!ok) {
-    console.log(theme.muted('Cancelled.'));
-    return;
-  }
-
   // If currently on the target branch, switch away first
   if (currentBranch === targetBranch) {
     await withSpinner(`Switching to ${defaultBranch}...`, () => checkout(defaultBranch));
@@ -71,11 +64,11 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
     process.exit(1);
   }
 
-  // Mark branch as abandoned
+  // Remove branch entry from registry
   if (trackedBranch) {
-    trackedBranch.status = 'abandoned';
-    trackedBranch.updatedAt = new Date().toISOString();
-    if (trackedBranch.worktreePath) trackedBranch.worktreePath = null;
+    branches.branches = branches.branches.filter(
+      (b) => b.branchName.toLowerCase() !== targetBranch.toLowerCase(),
+    );
     await configManager.saveBranches(projectId, branches);
   }
 

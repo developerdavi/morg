@@ -28,13 +28,15 @@ export async function runStart(
   let ticketTitle: string | null = null;
 
   if (isTicketId(input)) {
-    ticketId = input.trim().toUpperCase();
+    const candidateId = input.trim().toUpperCase();
     // Preserve the ticket ID's original case as the branch name (e.g. MORG-28 → branch MORG-28)
-    branchName = ticketId;
+    branchName = candidateId;
 
     // Enrich from tickets provider if available — non-fatal if not configured or fetch fails
+    // ticketId only set on successful fetch so failed lookups don't link the branch to a bad ID
     try {
-      const ticket = await fetchTicket(projectId, ticketId);
+      const ticket = await fetchTicket(projectId, candidateId);
+      ticketId = ticket.key;
       ticketTitle = ticket.title;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

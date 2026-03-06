@@ -68,12 +68,19 @@ export class GhClient {
   }
 
   async getPRForBranch(branch: string): Promise<GhPr | null> {
+    const env = await this.ghEnv();
+    // Fast path: exact case match
     const result = await execa('gh', ['pr', 'view', branch, '--json', PR_FIELDS], {
       reject: false,
-      env: await this.ghEnv(),
+      env,
     });
-    if (result.exitCode !== 0) return null;
-    return GhPrSchema.parse(JSON.parse(result.stdout));
+    if (result.exitCode === 0) return GhPrSchema.parse(JSON.parse(result.stdout));
+
+    // Fallback: case-insensitive search (handles pre-MORG-28 lowercase branch names
+    // where the remote PR headRefName may be uppercase)
+    const lower = branch.toLowerCase();
+    const prs = await this.listPRs('open');
+    return prs.find((pr) => pr.headRefName.toLowerCase() === lower) ?? null;
   }
 
   async getPRDiff(prNumber: number): Promise<string> {
