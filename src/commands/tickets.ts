@@ -12,6 +12,7 @@ import { select, text } from '../ui/prompts';
 import { getTicketsProvider } from '../utils/providers';
 import { IntegrationError } from '../utils/errors';
 import type { Ticket, TicketsProvider } from '../integrations/providers/types';
+import type { Branch } from '../config/schemas';
 import { runStart } from './start';
 
 function renderTicketDetail(ticket: Ticket): void {
@@ -40,27 +41,65 @@ function renderTicketDetail(ticket: Ticket): void {
   );
 }
 
+/** Returns the tracked branch name for a ticket key, if any. */
+function getTrackedBranchForTicket(branches: Branch[], ticketKey: string): string | undefined {
+  const upper = ticketKey.toUpperCase();
+  return branches.find((b) => b.ticketId?.toUpperCase() === upper)?.branchName;
+}
+
 async function runTicketActions(
   ticket: Ticket,
   projectId: string,
   provider: TicketsProvider,
+  context: {
+    currentBranch: string;
+    trackedBranchName?: string;
+    onBack?: () => Promise<void>;
+  },
 ): Promise<void> {
-  type Action = 'start' | 'status' | 'browser' | 'copy' | 'done';
+  type Action = 'start' | 'switch' | 'status' | 'browser' | 'copy' | 'back' | 'done';
 
-  const options: { value: Action; label: string; hint?: string }[] = [
-    { value: 'start', label: 'Start branch', hint: `checkout ${ticket.key}` },
-    { value: 'status', label: 'Change status', hint: ticket.status },
-    ...(ticket.url ? [{ value: 'browser' as Action, label: 'Open in browser' }] : []),
-    ...(ticket.url ? [{ value: 'copy' as Action, label: 'Copy URL' }] : []),
-    { value: 'done', label: 'Done' },
-  ];
+  const isTracked = !!context.trackedBranchName;
+  const isOnBranch = context.trackedBranchName === context.currentBranch;
+
+  const options: { value: Action; label: string; hint?: string }[] = [];
+
+  if (!isTracked) {
+    options.push({ value: 'start', label: 'Start branch', hint: `morg start ${ticket.key}` });
+  } else if (!isOnBranch) {
+    options.push({
+      value: 'switch',
+      label: 'Switch to branch',
+      hint: context.trackedBranchName,
+    });
+  }
+
+  options.push({ value: 'status', label: 'Change status', hint: ticket.status });
+  if (ticket.url) {
+    options.push({ value: 'browser', label: 'Open in browser' });
+    options.push({ value: 'copy', label: 'Copy URL' });
+  }
+  if (context.onBack) {
+    options.push({ value: 'back', label: 'Back to list' });
+  }
+  options.push({ value: 'done', label: 'Done' });
 
   const action = await select<Action>({ message: 'Action', options });
 
   if (action === 'done') return;
 
+  if (action === 'back') {
+    await context.onBack!();
+    return;
+  }
+
   if (action === 'start') {
     await runStart(ticket.key, {});
+    return;
+  }
+
+  if (action === 'switch') {
+    await runStart(context.trackedBranchName!, {});
     return;
   }
 
@@ -84,7 +123,6 @@ async function runTicketActions(
   }
 
   const url = ticket.url;
-
   if (!url) return;
 
   if (action === 'browser') {
@@ -113,13 +151,14 @@ async function runTickets(
   const projectId = await requireTrackedRepo();
   const plain = options.plain ?? false;
 
+  const [branchesFile, currentBranch] = await Promise.all([
+    configManager.getBranches(projectId),
+    getCurrentBranch(),
+  ]);
+
   // Resolve ticket ID: from arg, or (only for `ticket` singular) from current branch
   let resolvedId = ticketId?.toUpperCase();
   if (!resolvedId && resolveFromBranch) {
-    const [branchesFile, currentBranch] = await Promise.all([
-      configManager.getBranches(projectId),
-      getCurrentBranch(),
-    ]);
     const branch = findBranchCaseInsensitive(branchesFile.branches, currentBranch);
     resolvedId = branch?.ticketId ?? undefined;
   }
@@ -137,14 +176,15 @@ async function runTickets(
     );
   }
 
-  // If we have a resolved ID, go straight to detail view
+  // If we have a resolved ID, go straight to detail view (no back button)
   if (resolvedId) {
     const ticket = await withSpinner(`Fetching ${resolvedId}...`, () =>
       provider.getTicket(resolvedId!),
     );
     renderTicketDetail(ticket);
     if (!plain) {
-      await runTicketActions(ticket, projectId, provider);
+      const trackedBranchName = getTrackedBranchForTicket(branchesFile.branches, ticket.key);
+      await runTicketActions(ticket, projectId, provider, { currentBranch, trackedBranchName });
     }
     return;
   }
@@ -171,19 +211,28 @@ async function runTickets(
     return;
   }
 
-  // Interactive selection — label always shows key + title, hint shows status
-  const chosen = await select({
-    message: 'Select a ticket',
-    options: tickets.map((t) => ({
-      value: t.key,
-      label: `${t.key.padEnd(12)}${t.title}`,
-      hint: t.status,
-    })),
-  });
+  // Interactive selection with a back-capable detail flow
+  async function showList(): Promise<void> {
+    const chosen = await select({
+      message: 'Select a ticket',
+      options: tickets.map((t) => ({
+        value: t.key,
+        label: `${t.key.padEnd(12)}${t.title}`,
+        hint: t.status,
+      })),
+    });
 
-  const ticket = await withSpinner(`Fetching ${chosen}...`, () => provider.getTicket(chosen));
-  renderTicketDetail(ticket);
-  await runTicketActions(ticket, projectId, provider);
+    const ticket = await withSpinner(`Fetching ${chosen}...`, () => provider!.getTicket(chosen));
+    renderTicketDetail(ticket);
+    const trackedBranchName = getTrackedBranchForTicket(branchesFile.branches, ticket.key);
+    await runTicketActions(ticket, projectId, provider!, {
+      currentBranch,
+      trackedBranchName,
+      onBack: showList,
+    });
+  }
+
+  await showList();
 }
 
 export function registerTicketsCommand(program: Command): void {
