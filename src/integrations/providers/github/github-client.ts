@@ -1,7 +1,7 @@
 import { execa } from 'execa';
 import { z } from 'zod';
-import type { PrStatus } from '../../config/schemas';
-import { IntegrationError } from '../../utils/errors';
+import type { PrStatus } from '../../../config/schemas';
+import { IntegrationError } from '../../../utils/errors';
 
 const GhPrSchema = z.object({
   number: z.number(),
@@ -89,6 +89,20 @@ export class GhClient {
       env: await this.ghEnv(),
     });
     return result.stdout;
+  }
+
+  async getPRChecks(prNumber: number): Promise<{ name: string; state: string; bucket: string }[]> {
+    const result = await execa(
+      'gh',
+      ['pr', 'checks', String(prNumber), '--json', 'name,state,bucket'],
+      { reject: false, env: await this.ghEnv() },
+    );
+    if (result.exitCode !== 0 || !result.stdout.trim()) return [];
+    try {
+      return JSON.parse(result.stdout) as { name: string; state: string; bucket: string }[];
+    } catch {
+      return [];
+    }
   }
 }
 

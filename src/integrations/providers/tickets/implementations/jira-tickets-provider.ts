@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { JiraGlobalConfig, JiraProjectConfig } from '../../config/schemas';
-import { IntegrationError } from '../../utils/errors';
-import type { Ticket, TicketsProvider } from '../providers/types';
+import type { JiraGlobalConfig, JiraProjectConfig } from '../../../../config/schemas';
+import { IntegrationError } from '../../../../utils/errors';
+import type { Ticket, TicketsProvider } from '../tickets-provider';
 
 const JiraIssueSchema = z.object({
   id: z.string(),
@@ -59,7 +59,10 @@ export class JiraClient implements TicketsProvider {
   }
 
   async getIssue(ticketId: string): Promise<JiraIssue> {
-    const res = await fetch(this.url(`/issue/${ticketId}`), { headers: this.headers });
+    const res = await fetch(this.url(`/issue/${ticketId}`), {
+      headers: this.headers,
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!res.ok) {
       throw new IntegrationError(
         `Jira returned ${res.status} for ${ticketId}`,
@@ -99,9 +102,7 @@ export class JiraClient implements TicketsProvider {
       .join(' AND ');
     const res = await fetch(
       this.url(`/issue/search?jql=${encodeURIComponent(jql)}&maxResults=50`),
-      {
-        headers: this.headers,
-      },
+      { headers: this.headers, signal: AbortSignal.timeout(10_000) },
     );
     if (!res.ok) throw new IntegrationError(`Failed to list Jira issues (${res.status})`, 'jira');
     const data = (await res.json()) as { issues: unknown[] };
@@ -124,13 +125,17 @@ export class JiraClient implements TicketsProvider {
     if (this.projectConfig?.projectKey) {
       const res = await fetch(this.url(`/project/${this.projectConfig.projectKey}/statuses`), {
         headers: this.headers,
+        signal: AbortSignal.timeout(10_000),
       });
       if (res.ok) {
         const data = (await res.json()) as { statuses: { name: string }[] }[];
         return [...new Set(data.flatMap((t) => t.statuses.map((s) => s.name)))];
       }
     }
-    const res = await fetch(this.url('/status'), { headers: this.headers });
+    const res = await fetch(this.url('/status'), {
+      headers: this.headers,
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!res.ok)
       throw new IntegrationError(`Failed to fetch Jira statuses (${res.status})`, 'jira');
     const data = (await res.json()) as { name: string }[];
@@ -142,9 +147,9 @@ export class JiraClient implements TicketsProvider {
   }
 
   async transitionIssue(ticketId: string, transitionName: string): Promise<void> {
-    // Get available transitions
     const tRes = await fetch(this.url(`/issue/${ticketId}/transitions`), {
       headers: this.headers,
+      signal: AbortSignal.timeout(10_000),
     });
     if (!tRes.ok) throw new IntegrationError(`Failed to get transitions for ${ticketId}`, 'jira');
 
@@ -163,6 +168,7 @@ export class JiraClient implements TicketsProvider {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ transition: { id: transition.id } }),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       throw new IntegrationError(`Failed to transition ${ticketId} to "${transitionName}"`, 'jira');

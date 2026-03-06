@@ -1,8 +1,9 @@
 import { execa } from 'execa';
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import { GhClient, ghPrToPrStatus } from '../integrations/github/client';
+import { ghPrToPrStatus } from '../integrations/providers/github/github-client';
 import { requireTrackedRepo } from '../utils/detect';
+import { registry } from '../services/registry';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { confirm, select } from '../ui/prompts';
@@ -28,12 +29,12 @@ async function hasDiverged(branch: string, defaultBranch: string): Promise<boole
 
 async function runSync(options: { all?: boolean }): Promise<void> {
   const projectId = await requireTrackedRepo();
-  const [globalConfig, projectConfig] = await Promise.all([
+  const [globalConfig, projectConfig, gh] = await Promise.all([
     configManager.getGlobalConfig(),
     configManager.getProjectConfig(projectId),
+    registry.gh(),
   ]);
   const { defaultBranch } = projectConfig;
-  const gh = new GhClient(projectConfig.githubUsername);
   const autoDeleteMerged = projectConfig.autoDeleteMerged ?? globalConfig.autoDeleteMerged;
   const autoUpdateTicketStatus =
     projectConfig.autoUpdateTicketStatus ?? globalConfig.autoUpdateTicketStatus;

@@ -1,5 +1,6 @@
-import type { NotionGlobalConfig, NotionProjectConfig } from '../../config/schemas';
-import type { Ticket, TicketsProvider } from '../providers/types';
+import type { NotionGlobalConfig, NotionProjectConfig } from '../../../../config/schemas';
+import { IntegrationError } from '../../../../utils/errors';
+import type { Ticket, TicketsProvider } from '../tickets-provider';
 
 const BASE_URL = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
@@ -45,10 +46,15 @@ export class NotionClient implements TicketsProvider {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       const err = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new Error(`Notion API error ${res.status}: ${err.message ?? res.statusText}`);
+      throw new IntegrationError(
+        `Notion API error ${res.status}: ${err.message ?? res.statusText}`,
+        'notion',
+        'Check your Notion API token and database ID.',
+      );
     }
     const data = (await res.json()) as { results: NotionPage[] };
     return data.results.filter((r) => r.object === 'page');
@@ -68,7 +74,12 @@ export class NotionClient implements TicketsProvider {
 
     const pages = await this.queryDatabase({ filter });
     const page = pages[0];
-    if (!page) throw new Error(`Ticket ${ticketId} not found in Notion`);
+    if (!page)
+      throw new IntegrationError(
+        `Ticket ${ticketId} not found in Notion`,
+        'notion',
+        'Check the ticket ID and your Notion database configuration.',
+      );
 
     const [ticket, description] = await Promise.all([
       Promise.resolve(this.mapPage(page)),
@@ -95,6 +106,7 @@ export class NotionClient implements TicketsProvider {
   async getStatuses(): Promise<string[]> {
     const res = await fetch(`${BASE_URL}/databases/${this.projectConfig.databaseId}`, {
       headers: this.headers,
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return [];
     const db = (await res.json()) as {
@@ -120,16 +132,22 @@ export class NotionClient implements TicketsProvider {
           },
         },
       }),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       const err = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new Error(`Notion API error ${res.status}: ${err.message ?? res.statusText}`);
+      throw new IntegrationError(
+        `Notion API error ${res.status}: ${err.message ?? res.statusText}`,
+        'notion',
+        'Check your Notion API token and database permissions.',
+      );
     }
   }
 
   private async fetchPageContent(pageId: string): Promise<string> {
     const res = await fetch(`${BASE_URL}/blocks/${pageId}/children`, {
       headers: this.headers,
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return '';
     const data = (await res.json()) as { results: NotionBlock[] };

@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { configManager } from '../config/manager';
 import { getRepoRoot, getRemote, getDefaultBranch } from '../git/index';
 import { theme, symbols } from '../ui/theme';
-import { intro, outro, text, confirm } from '../ui/prompts';
+import { intro, outro, text, confirm, select } from '../ui/prompts';
 import { withSpinner } from '../ui/spinner';
 
 const NOTION_ID_RE = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})/i;
@@ -80,12 +80,6 @@ async function runInit(): Promise<void> {
     validate: (v) => (v.includes('/') ? undefined : 'Format: owner/repo'),
   });
 
-  const githubUsername = await text({
-    message: 'GitHub username for this project (used for gh CLI auth)',
-    initialValue: existingProjectConfig?.githubUsername ?? globalConfig.githubUsername,
-    validate: (v) => (v.trim() ? undefined : 'Required'),
-  });
-
   const detectedBranch = await getDefaultBranch();
   const defaultBranch = await text({
     message: 'Default branch (used as PR base and branch creation base)',
@@ -129,6 +123,21 @@ async function runInit(): Promise<void> {
     );
   }
 
+  // Profile selection (only shown if profiles exist)
+  let selectedProfile: string | undefined = existingProjectConfig?.profile;
+  const profiles = await configManager.listProfiles();
+  if (profiles.length > 0) {
+    selectedProfile = await select({
+      message: 'Profile to use for this project (sets GitHub account, integrations, etc.)',
+      options: [
+        { value: '', label: 'None (use global config)' },
+        ...profiles.map((p) => ({ value: p, label: p })),
+      ],
+      initialValue: selectedProfile ?? '',
+    });
+    if (selectedProfile === '') selectedProfile = undefined;
+  }
+
   const now = new Date().toISOString();
   await configManager.saveProjects({
     version: 1,
@@ -141,9 +150,9 @@ async function runInit(): Promise<void> {
   await configManager.saveProjectConfig(projectId, {
     version: 1,
     projectId,
-    githubUsername,
     githubRepo,
     defaultBranch,
+    profile: selectedProfile,
     integrations: {
       github: { enabled: true },
       jira:

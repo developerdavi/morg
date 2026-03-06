@@ -16,6 +16,7 @@ import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { fetchTicket, promptTicketInProgress } from '../utils/providers';
+import { registry } from '../services/registry';
 
 export async function runStart(
   input: string,
@@ -34,13 +35,16 @@ export async function runStart(
 
     // Enrich from tickets provider if available — non-fatal if not configured or fetch fails
     // ticketId only set on successful fetch so failed lookups don't link the branch to a bad ID
-    try {
-      const ticket = await fetchTicket(projectId, candidateId);
-      ticketId = ticket.key;
-      ticketTitle = ticket.title;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.log(theme.warning(`  ${symbols.warning} Could not fetch ticket: ${msg}`));
+    const ticketsProvider = await registry.tickets().catch(() => null);
+    if (ticketsProvider) {
+      try {
+        const ticket = await fetchTicket(ticketsProvider, candidateId);
+        ticketId = ticket.key;
+        ticketTitle = ticket.title;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(theme.warning(`  ${symbols.warning} Could not fetch ticket: ${msg}`));
+      }
     }
   } else {
     branchName = input;

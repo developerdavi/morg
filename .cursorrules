@@ -1,0 +1,56 @@
+# morg — Cursor rules
+
+## Architecture constraints
+
+- Commands in `src/commands/` MUST NOT import integration clients (JiraClient, GhClient, etc.) directly
+- Use `registry` from `src/services/registry.ts` for all client instantiation
+- `src/config/manager.ts` and `src/git/index.ts` are leaf nodes — no imports from the rest of src/
+- All external data must be parsed through Zod schemas at the boundary
+- All JSON state read/write goes through `configManager` — never direct `fs` calls in commands
+
+## Module conventions
+
+- ESM-native: no `.js` extensions on imports, no dynamic `await import()` inside functions
+- All imports are static and at the top of each file
+- Package manager: pnpm (never npm or yarn)
+
+## Integration client pattern
+
+```typescript
+// WRONG — never do this in commands:
+import { JiraClient } from '../integrations/jira/client';
+const client = new JiraClient(globalConfig.integrations.jira, projectConfig.integrations.jira);
+
+// CORRECT:
+import { registry } from '../services/registry';
+const tickets = await registry.tickets(); // TicketsProvider | null
+```
+
+## Adding a new integration
+
+1. Interface: `src/integrations/providers/<domain>/<domain>-provider.ts`
+2. Implementation: `src/integrations/providers/<domain>/implementations/<name>-<domain>-provider.ts`
+3. Registry method: add to `Registry` class in `src/services/registry.ts`
+4. Schema: add to `src/config/schemas.ts`
+5. Tests: `tests/integrations/<name>.test.ts`
+
+## After editing src/
+
+```bash
+pnpm lint --fix    # always run before committing
+pnpm typecheck     # ensure no type errors
+pnpm test          # ensure tests pass
+pnpm build && morg <command>  # verify binary works
+```
+
+## execa convention
+
+Always `{ reject: false }` — check `result.exitCode` instead of catching exceptions.
+
+## Never
+
+- Skip hooks (--no-verify)
+- Use npm or yarn
+- Import integration clients directly in commands
+- Read ~/.morg files directly (use configManager)
+- Add dynamic imports or require() calls

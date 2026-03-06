@@ -16,3 +16,15 @@ export function projectConfigFile(id: string): string {
 export function projectBranchesFile(id: string): string {
   return join(projectDir(id), 'branches.json');
 }
+
+export function profilesDir(): string {
+  return join(MORG_DIR, 'profiles');
+}
+
+export function profileDir(name: string): string {
+  return join(profilesDir(), name);
+}
+
+export function profileConfigFile(name: string): string {
+  return join(profileDir(name), 'config.json');
+}

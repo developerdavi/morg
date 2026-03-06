@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { AIProvider } from '../providers/types';
+import type { AIProvider } from '../ai-provider';
 
 export class ClaudeClient implements AIProvider {
   private readonly client: Anthropic;

@@ -2,13 +2,13 @@ import { execa } from 'execa';
 import boxen from 'boxen';
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import { GhClient } from '../integrations/github/client';
 import { getCurrentBranch, getCommitsOnBranch } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
 import { fetchTicket } from '../utils/providers';
 import { findBranchCaseInsensitive } from '../utils/ticket';
 import { renderStatus } from '../ui/output';
 import { theme, symbols } from '../ui/theme';
+import { registry } from '../services/registry';
 
 async function runStatusDetail(targetBranch: string, projectId: string): Promise<void> {
   const [branchesFile, projectConfig] = await Promise.all([
@@ -26,13 +26,14 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
 
   const defaultBranch = projectConfig.defaultBranch;
 
+  const ticketsProvider = await registry.tickets();
+  const gh = projectConfig.integrations.github?.enabled !== false ? await registry.gh() : null;
+
   const [ticketResult, prResult, commitsResult, diffResult] = await Promise.allSettled([
-    trackedBranch?.ticketId
-      ? fetchTicket(projectId, trackedBranch.ticketId)
+    ticketsProvider && trackedBranch?.ticketId
+      ? fetchTicket(ticketsProvider, trackedBranch.ticketId)
       : Promise.reject(new Error('no ticket')),
-    projectConfig.integrations.github?.enabled !== false
-      ? new GhClient(projectConfig.githubUsername).getPRForBranch(targetBranch)
-      : Promise.reject(new Error('github not enabled')),
+    gh ? gh.getPRForBranch(targetBranch) : Promise.reject(new Error('github not enabled')),
     getCommitsOnBranch(defaultBranch),
     execa('git', ['diff', '--stat', `${defaultBranch}...HEAD`], { reject: false }),
   ]);
@@ -63,6 +64,30 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
     lines.push(`${theme.muted('  URL:')} ${pr.url}`);
     if (pr.reviewDecision) {
       lines.push(`${theme.muted('  Review:')} ${pr.reviewDecision}`);
+    }
+
+    // CI status
+    if (gh) {
+      try {
+        const checks = await gh.getPRChecks(pr.number);
+        if (checks.length > 0) {
+          const passing = checks.filter((c) => c.bucket === 'pass').length;
+          const failing = checks.filter((c) => c.bucket === 'fail').length;
+          const pending = checks.filter((c) => c.bucket !== 'pass' && c.bucket !== 'fail').length;
+          let ciLine = `${theme.muted('  CI:')}     `;
+          if (failing > 0) {
+            ciLine += theme.error(`✗ ${failing}/${checks.length} failing`);
+          } else if (pending > 0) {
+            ciLine += theme.muted(`⏳ ${pending} pending`);
+            if (passing > 0) ciLine += ` · ` + theme.success(`✓ ${passing} passing`);
+          } else if (passing > 0) {
+            ciLine += theme.success(`✓ ${passing}/${checks.length} passing`);
+          }
+          lines.push(ciLine);
+        }
+      } catch {
+        // CI status is non-fatal
+      }
     }
   }
 
@@ -110,19 +135,36 @@ export function registerStatusCommand(program: Command): void {
     .description('Show branch status detail (default: current branch)')
     .option('--branch <branch>', 'Branch for shell prompt integration')
     .option('--short', 'Short output for shell prompt integration')
-    .action(async (branch: string | undefined, options: { branch?: string; short?: boolean }) => {
-      if (options.short) {
-        return renderStatus({ branch: options.branch, short: true });
-      }
-      let projectId: string;
-      try {
-        projectId = await requireTrackedRepo();
-      } catch {
-        console.log(theme.muted('Not in a morg-tracked repo.'), theme.muted('Run: morg init'));
-        return;
-      }
-      const currentBranch = await getCurrentBranch();
-      const targetBranch = branch ?? currentBranch;
-      await runStatusDetail(targetBranch, projectId);
-    });
+    .option('--json', 'Output branches as JSON')
+    .action(
+      async (
+        branch: string | undefined,
+        options: { branch?: string; short?: boolean; json?: boolean },
+      ) => {
+        if (options.short) {
+          return renderStatus({ branch: options.branch, short: true });
+        }
+        let projectId: string;
+        try {
+          projectId = await requireTrackedRepo();
+        } catch {
+          if (options.json) {
+            process.stdout.write(JSON.stringify({ branches: [] }, null, 2) + '\n');
+            return;
+          }
+          console.log(theme.muted('Not in a morg-tracked repo.'), theme.muted('Run: morg init'));
+          return;
+        }
+
+        if (options.json) {
+          const branchesFile = await configManager.getBranches(projectId);
+          process.stdout.write(JSON.stringify({ branches: branchesFile.branches }, null, 2) + '\n');
+          return;
+        }
+
+        const currentBranch = await getCurrentBranch();
+        const targetBranch = branch ?? currentBranch;
+        await runStatusDetail(targetBranch, projectId);
+      },
+    );
 }

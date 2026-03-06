@@ -1,15 +1,16 @@
 import { WebClient } from '@slack/web-api';
-import type { SlackGlobalConfig } from '../../config/schemas';
-import { IntegrationError } from '../../utils/errors';
+import type { SlackGlobalConfig } from '../../../../config/schemas';
+import { IntegrationError } from '../../../../utils/errors';
+import type { MessagingProvider } from '../messaging-provider';
 
-export class SlackClient {
+export class SlackClient implements MessagingProvider {
   private readonly client: WebClient;
 
   constructor(private readonly config: SlackGlobalConfig) {
     this.client = new WebClient(config.apiToken);
   }
 
-  async postMessage(channel: string, text: string): Promise<string> {
+  async sendMessage(channel: string, text: string): Promise<void> {
     const result = await this.client.chat.postMessage({ channel, text });
     if (!result.ok) {
       throw new IntegrationError(
@@ -17,7 +18,6 @@ export class SlackClient {
         'slack',
       );
     }
-    return result.ts ?? '';
   }
 
   async getUserInfo(userId: string): Promise<{ name: string; email: string }> {
