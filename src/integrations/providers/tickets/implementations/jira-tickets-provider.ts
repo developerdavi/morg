@@ -3,37 +3,76 @@ import type { JiraGlobalConfig, JiraProjectConfig } from '../../../../config/sch
 import { IntegrationError } from '../../../../utils/errors';
 import type { Ticket, TicketsProvider } from '../tickets-provider';
 
+const JiraIssueRefSchema = z.object({
+  key: z.string(),
+  fields: z.object({
+    summary: z.string(),
+    status: z.object({ name: z.string() }),
+  }),
+});
+
 const JiraIssueSchema = z.object({
   id: z.string(),
   key: z.string(),
   fields: z.object({
     summary: z.string(),
-    status: z.object({
-      name: z.string(),
-    }),
-    assignee: z
-      .object({
-        displayName: z.string(),
-        emailAddress: z.string(),
-      })
-      .nullable()
-      .optional(),
+    status: z.object({ name: z.string() }),
+    assignee: z.object({ displayName: z.string(), emailAddress: z.string() }).nullable().optional(),
     description: z.unknown().optional(),
+    parent: JiraIssueRefSchema.optional().nullable(),
+    subtasks: z.array(JiraIssueRefSchema).optional(),
+    issuelinks: z
+      .array(
+        z.object({
+          type: z.object({ name: z.string() }),
+          inwardIssue: JiraIssueRefSchema.optional(),
+          outwardIssue: JiraIssueRefSchema.optional(),
+        }),
+      )
+      .optional(),
   }),
 });
 
 export type JiraIssue = z.infer<typeof JiraIssueSchema>;
 
-/** Convert Atlassian Document Format (ADF) to plain text. */
-function adfToText(node: unknown): string {
+/** Convert Atlassian Document Format (ADF) to markdown. Links are preserved as [text](url). */
+function adfToMarkdown(node: unknown): string {
   if (!node || typeof node !== 'object') return '';
-  const n = node as { type?: string; text?: string; content?: unknown[] };
-  if (n.type === 'text') return n.text ?? '';
+  const n = node as {
+    type?: string;
+    text?: string;
+    content?: unknown[];
+    marks?: { type: string; attrs?: { href?: string } }[];
+    attrs?: { level?: number; url?: string };
+  };
+
   if (n.type === 'hardBreak') return '\n';
-  const children = n.content?.map(adfToText).join('') ?? '';
-  if (n.type === 'paragraph' || n.type === 'heading') return children + '\n';
-  if (n.type === 'listItem') return '• ' + children;
-  if (n.type === 'codeBlock') return children + '\n';
+  if (n.type === 'inlineCard') return n.attrs?.url ? `<${n.attrs.url}>` : '';
+
+  if (n.type === 'text') {
+    const text = n.text ?? '';
+    const linkMark = n.marks?.find((m) => m.type === 'link');
+    if (linkMark?.attrs?.href) return `[${text}](${linkMark.attrs.href})`;
+    const codeMark = n.marks?.find((m) => m.type === 'code');
+    if (codeMark) return `\`${text}\``;
+    return text;
+  }
+
+  const children = n.content?.map(adfToMarkdown).join('') ?? '';
+
+  if (n.type === 'paragraph') return children + '\n';
+  if (n.type === 'heading') return `${'#'.repeat(n.attrs?.level ?? 1)} ${children}\n`;
+  if (n.type === 'listItem') return `• ${children.trimEnd()}\n`;
+  if (n.type === 'bulletList' || n.type === 'orderedList') return children;
+  if (n.type === 'codeBlock') return `\`\`\`\n${children}\`\`\`\n`;
+  if (n.type === 'blockquote')
+    return (
+      children
+        .split('\n')
+        .map((l) => `> ${l}`)
+        .join('\n') + '\n'
+    );
+  if (n.type === 'rule') return '---\n';
   return children;
 }
 
@@ -74,11 +113,77 @@ export class JiraClient implements TicketsProvider {
     return JiraIssueSchema.parse(data);
   }
 
+  async getChildIssues(ticketId: string): Promise<z.infer<typeof JiraIssueRefSchema>[]> {
+    const jql = `parent = "${ticketId}" ORDER BY created ASC`;
+    const res = await fetch(
+      this.url(`/search/jql?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,status`),
+      { headers: this.headers, signal: AbortSignal.timeout(10_000) },
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as { issues: unknown[] };
+    return data.issues.flatMap((raw) => {
+      try {
+        return [JiraIssueRefSchema.parse(raw)];
+      } catch {
+        return [];
+      }
+    });
+  }
+
   async getTicket(ticketId: string): Promise<Ticket> {
     const issue = await this.getIssue(ticketId);
     const description = issue.fields.description
-      ? adfToText(issue.fields.description).trim() || undefined
+      ? adfToMarkdown(issue.fields.description).trim() || undefined
       : undefined;
+
+    const parent = issue.fields.parent
+      ? {
+          key: issue.fields.parent.key,
+          title: issue.fields.parent.fields.summary,
+          status: issue.fields.parent.fields.status.name,
+          url: `${this.config.baseUrl}/browse/${issue.fields.parent.key}`,
+        }
+      : null;
+
+    // fields.subtasks only contains actual Sub-task type issues.
+    // Epic children (Features/Stories) are only accessible via JQL parent = key.
+    // Fetch both and merge.
+    const directSubtasks = (issue.fields.subtasks ?? []).map((s) => ({
+      key: s.key,
+      title: s.fields.summary,
+      status: s.fields.status.name,
+      url: `${this.config.baseUrl}/browse/${s.key}`,
+    }));
+
+    const childIssues = await this.getChildIssues(issue.key);
+    const directSubtaskKeys = new Set(directSubtasks.map((s) => s.key));
+    const epicChildren = childIssues
+      .filter((c) => !directSubtaskKeys.has(c.key))
+      .map((c) => ({
+        key: c.key,
+        title: c.fields.summary,
+        status: c.fields.status.name,
+        url: `${this.config.baseUrl}/browse/${c.key}`,
+      }));
+
+    const subtasks = [...directSubtasks, ...epicChildren];
+
+    const issueLinks = (issue.fields.issuelinks ?? []).flatMap((l) => {
+      const ref = l.inwardIssue ?? l.outwardIssue;
+      if (!ref) return [];
+      return [
+        {
+          type: l.type.name,
+          ticket: {
+            key: ref.key,
+            title: ref.fields.summary,
+            status: ref.fields.status.name,
+            url: `${this.config.baseUrl}/browse/${ref.key}`,
+          },
+        },
+      ];
+    });
+
     return {
       id: issue.key,
       key: issue.key,
@@ -89,6 +194,9 @@ export class JiraClient implements TicketsProvider {
         ? { name: issue.fields.assignee.displayName, email: issue.fields.assignee.emailAddress }
         : null,
       description,
+      parent,
+      subtasks: subtasks.length > 0 ? subtasks : undefined,
+      issueLinks: issueLinks.length > 0 ? issueLinks : undefined,
     };
   }
 
