@@ -25,7 +25,7 @@ const JiraIssueSchema = z.object({
     issuelinks: z
       .array(
         z.object({
-          type: z.object({ name: z.string() }),
+          type: z.object({ name: z.string(), inward: z.string(), outward: z.string() }),
           inwardIssue: JiraIssueRefSchema.optional(),
           outwardIssue: JiraIssueRefSchema.optional(),
         }),
@@ -170,19 +170,33 @@ export class JiraClient implements TicketsProvider {
     const subtasks = [...directSubtasks, ...epicChildren];
 
     const issueLinks = (issue.fields.issuelinks ?? []).flatMap((l) => {
-      const ref = l.inwardIssue ?? l.outwardIssue;
-      if (!ref) return [];
-      return [
-        {
-          type: l.type.name,
-          ticket: {
-            key: ref.key,
-            title: ref.fields.summary,
-            status: ref.fields.status.name,
-            url: `${this.config.baseUrl}/browse/${ref.key}`,
+      if (l.inwardIssue) {
+        return [
+          {
+            type: l.type.inward,
+            ticket: {
+              key: l.inwardIssue.key,
+              title: l.inwardIssue.fields.summary,
+              status: l.inwardIssue.fields.status.name,
+              url: `${this.config.baseUrl}/browse/${l.inwardIssue.key}`,
+            },
           },
-        },
-      ];
+        ];
+      }
+      if (l.outwardIssue) {
+        return [
+          {
+            type: l.type.outward,
+            ticket: {
+              key: l.outwardIssue.key,
+              title: l.outwardIssue.fields.summary,
+              status: l.outwardIssue.fields.status.name,
+              url: `${this.config.baseUrl}/browse/${l.outwardIssue.key}`,
+            },
+          },
+        ];
+      }
+      return [];
     });
 
     return {
