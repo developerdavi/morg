@@ -17,6 +17,7 @@ const JiraIssueSchema = z.object({
   fields: z.object({
     summary: z.string(),
     status: z.object({ name: z.string() }),
+    issuetype: z.object({ name: z.string() }).optional(),
     assignee: z.object({ displayName: z.string(), emailAddress: z.string() }).nullable().optional(),
     description: z.unknown().optional(),
     parent: JiraIssueRefSchema.optional().nullable(),
@@ -189,6 +190,7 @@ export class JiraClient implements TicketsProvider {
       key: issue.key,
       title: issue.fields.summary,
       status: issue.fields.status.name,
+      issueType: issue.fields.issuetype?.name,
       url: `${this.config.baseUrl}/browse/${issue.key}`,
       assignee: issue.fields.assignee
         ? { name: issue.fields.assignee.displayName, email: issue.fields.assignee.emailAddress }
@@ -216,7 +218,7 @@ export class JiraClient implements TicketsProvider {
       jql = clauses.length > 0 ? clauses.join(' AND ') : 'assignee = currentUser()';
     }
 
-    const fields = 'summary,status,assignee';
+    const fields = 'summary,status,assignee,issuetype';
     const res = await fetch(
       this.url(
         `/search/jql?jql=${encodeURIComponent(`${jql} ${orderBy}`)}&maxResults=50&fields=${fields}`,
@@ -232,6 +234,7 @@ export class JiraClient implements TicketsProvider {
         key: issue.key,
         title: issue.fields.summary,
         status: issue.fields.status.name,
+        issueType: issue.fields.issuetype?.name,
         url: `${this.config.baseUrl}/browse/${issue.key}`,
         assignee: issue.fields.assignee
           ? { name: issue.fields.assignee.displayName, email: issue.fields.assignee.emailAddress }

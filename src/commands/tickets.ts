@@ -16,19 +16,38 @@ import type { Branch } from '../config/schemas';
 import { runStart } from './start';
 
 function renderTicketDetail(ticket: Ticket): void {
+  const typeTag = ticket.issueType ? `  ${theme.muted(`[${ticket.issueType}]`)}` : '';
   const lines: string[] = [
-    `${theme.primaryBold(ticket.key)}  ${theme.muted(ticket.status)}`,
+    `${theme.primaryBold(ticket.key)}  ${theme.muted(ticket.status)}${typeTag}`,
     ``,
     theme.bold(ticket.title),
   ];
+  if (ticket.parent) {
+    lines.push(
+      ``,
+      `${theme.muted('Parent:')}    ${theme.primary(ticket.parent.key)}  ${theme.muted(ticket.parent.status)}  ${ticket.parent.title}`,
+    );
+  }
   if (ticket.assignee) {
     lines.push(``, `${theme.muted('Assignee:')}  ${ticket.assignee.name}`);
   }
   if (ticket.url) {
     lines.push(``, `${theme.muted('URL:')}      ${theme.primary(ticket.url)}`);
   }
+  if (ticket.subtasks && ticket.subtasks.length > 0) {
+    lines.push(``, theme.muted(`Subtasks (${ticket.subtasks.length}):`));
+    for (const s of ticket.subtasks) {
+      lines.push(`  ${theme.primary(s.key)}  ${theme.muted(s.status)}  ${s.title}`);
+    }
+  }
+  if (ticket.issueLinks && ticket.issueLinks.length > 0) {
+    lines.push(``, theme.muted('Links:'));
+    for (const l of ticket.issueLinks) {
+      lines.push(`  ${theme.muted(l.type)}  ${theme.primary(l.ticket.key)}  ${l.ticket.title}`);
+    }
+  }
   if (ticket.description) {
-    lines.push(``, theme.muted(ticket.description));
+    lines.push(``, ticket.description);
   }
 
   console.log('');
@@ -47,6 +66,25 @@ function getTrackedBranchForTicket(branches: Branch[], ticketKey: string): strin
   return branches.find((b) => b.ticketId?.toUpperCase() === upper)?.branchName;
 }
 
+async function openTicketDetail(
+  key: string,
+  projectId: string,
+  provider: TicketsProvider,
+  currentBranch: string,
+  branchesFile: Awaited<ReturnType<typeof configManager.getBranches>>,
+  onBack?: () => Promise<void>,
+): Promise<void> {
+  const ticket = await withSpinner(`Fetching ${key}...`, () => provider.getTicket(key));
+  renderTicketDetail(ticket);
+  const trackedBranchName = getTrackedBranchForTicket(branchesFile.branches, ticket.key);
+  await runTicketActions(ticket, projectId, provider, {
+    currentBranch,
+    trackedBranchName,
+    branchesFile,
+    onBack,
+  });
+}
+
 async function runTicketActions(
   ticket: Ticket,
   projectId: string,
@@ -54,10 +92,21 @@ async function runTicketActions(
   context: {
     currentBranch: string;
     trackedBranchName?: string;
+    branchesFile: Awaited<ReturnType<typeof configManager.getBranches>>;
     onBack?: () => Promise<void>;
   },
 ): Promise<void> {
-  type Action = 'start' | 'switch' | 'status' | 'browser' | 'copy' | 'back' | 'done';
+  type Action =
+    | 'start'
+    | 'switch'
+    | 'status'
+    | 'browser'
+    | 'copy'
+    | 'parent'
+    | 'subtasks'
+    | `link:${string}`
+    | 'back'
+    | 'done';
 
   const isTracked = !!context.trackedBranchName;
   const isOnBranch = context.trackedBranchName === context.currentBranch;
@@ -79,6 +128,29 @@ async function runTicketActions(
     options.push({ value: 'browser', label: 'Open in browser' });
     options.push({ value: 'copy', label: 'Copy URL' });
   }
+  if (ticket.parent) {
+    options.push({
+      value: 'parent',
+      label: `Go to parent: ${ticket.parent.key}`,
+      hint: ticket.parent.title.slice(0, 40),
+    });
+  }
+  if (ticket.subtasks && ticket.subtasks.length > 0) {
+    options.push({
+      value: 'subtasks',
+      label: 'View child issues',
+      hint: `${ticket.subtasks.length} issue${ticket.subtasks.length === 1 ? '' : 's'}`,
+    });
+  }
+  if (ticket.issueLinks && ticket.issueLinks.length > 0) {
+    for (const l of ticket.issueLinks) {
+      options.push({
+        value: `link:${l.ticket.key}` as Action,
+        label: `${l.type}: ${l.ticket.key}`,
+        hint: l.ticket.title.slice(0, 40),
+      });
+    }
+  }
   if (context.onBack) {
     options.push({ value: 'back', label: 'Back to list' });
   }
@@ -90,6 +162,51 @@ async function runTicketActions(
 
   if (action === 'back') {
     await context.onBack!();
+    return;
+  }
+
+  if (action === 'parent' && ticket.parent) {
+    await openTicketDetail(
+      ticket.parent.key,
+      projectId,
+      provider,
+      context.currentBranch,
+      context.branchesFile,
+      () => runTicketActions(ticket, projectId, provider, context),
+    );
+    return;
+  }
+
+  if (action === 'subtasks' && ticket.subtasks && ticket.subtasks.length > 0) {
+    const chosenKey = await select({
+      message: 'Select child issue',
+      options: ticket.subtasks.map((s) => ({
+        value: s.key,
+        label: `${s.key.padEnd(12)}${s.title}`,
+        hint: s.status,
+      })),
+    });
+    await openTicketDetail(
+      chosenKey,
+      projectId,
+      provider,
+      context.currentBranch,
+      context.branchesFile,
+      () => runTicketActions(ticket, projectId, provider, context),
+    );
+    return;
+  }
+
+  if (typeof action === 'string' && action.startsWith('link:')) {
+    const key = action.slice('link:'.length);
+    await openTicketDetail(
+      key,
+      projectId,
+      provider,
+      context.currentBranch,
+      context.branchesFile,
+      () => runTicketActions(ticket, projectId, provider, context),
+    );
     return;
   }
 
@@ -187,7 +304,11 @@ async function runTickets(
     renderTicketDetail(ticket);
     if (!plain) {
       const trackedBranchName = getTrackedBranchForTicket(branchesFile.branches, ticket.key);
-      await runTicketActions(ticket, projectId, provider, { currentBranch, trackedBranchName });
+      await runTicketActions(ticket, projectId, provider, {
+        currentBranch,
+        trackedBranchName,
+        branchesFile,
+      });
     }
     return;
   }
@@ -209,13 +330,23 @@ async function runTickets(
 
   if (plain) {
     const table = new Table({
-      head: [theme.primaryBold('Key'), theme.primaryBold('Title'), theme.primaryBold('Status')],
+      head: [
+        theme.primaryBold('Key'),
+        theme.primaryBold('Title'),
+        theme.primaryBold('Type'),
+        theme.primaryBold('Status'),
+      ],
       style: { head: [], border: [] },
-      colWidths: [14, 60, 20],
+      colWidths: [14, 50, 16, 20],
       wordWrap: true,
     });
     for (const t of tickets) {
-      table.push([theme.primary(t.key), t.title, theme.muted(t.status)]);
+      table.push([
+        theme.primary(t.key),
+        t.title,
+        theme.muted(t.issueType ?? ''),
+        theme.muted(t.status),
+      ]);
     }
     console.log('');
     console.log(table.toString());
@@ -229,7 +360,7 @@ async function runTickets(
       options: tickets.map((t) => ({
         value: t.key,
         label: `${t.key.padEnd(12)}${t.title}`,
-        hint: t.status,
+        hint: t.issueType ? `${t.issueType} · ${t.status}` : t.status,
       })),
     });
 
@@ -239,6 +370,7 @@ async function runTickets(
     await runTicketActions(ticket, projectId, provider!, {
       currentBranch,
       trackedBranchName,
+      branchesFile,
       onBack: showList,
     });
   }
@@ -254,8 +386,9 @@ export function registerTicketsCommand(program: Command): void {
     .option('--plain', 'Output list/detail without interactive prompts (for scripts/pipes)')
     .option('--json', 'Output as JSON (for scripting)')
     .option('--history', 'Show recently accessed tickets (like jira issue list --history)')
-    .action((id: string | undefined, options: { plain?: boolean; json?: boolean; history?: boolean }) =>
-      runTickets(id, options, false),
+    .action(
+      (id: string | undefined, options: { plain?: boolean; json?: boolean; history?: boolean }) =>
+        runTickets(id, options, false),
     );
 
   // `morg ticket [id]` — resolves to current branch ticket if no id given
