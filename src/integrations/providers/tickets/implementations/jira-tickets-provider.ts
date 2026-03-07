@@ -226,10 +226,11 @@ export class JiraClient implements TicketsProvider {
       orderBy = 'ORDER BY lastViewed DESC';
     } else {
       const clauses = [
+        'assignee = currentUser()',
         projectKey ? `project="${projectKey}"` : null,
         opts?.status ? `status="${opts.status}"` : null,
       ].filter(Boolean);
-      jql = clauses.length > 0 ? clauses.join(' AND ') : 'assignee = currentUser()';
+      jql = clauses.join(' AND ');
     }
 
     const fields = 'summary,status,assignee,issuetype';
