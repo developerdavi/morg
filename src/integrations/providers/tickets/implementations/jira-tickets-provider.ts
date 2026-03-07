@@ -92,16 +92,27 @@ export class JiraClient implements TicketsProvider {
     };
   }
 
-  async listTickets(opts?: { status?: string }): Promise<Ticket[]> {
+  async listTickets(opts?: { status?: string; history?: boolean }): Promise<Ticket[]> {
     const projectKey = this.projectConfig?.projectKey;
-    const jql = [
-      projectKey ? `project="${projectKey}"` : null,
-      opts?.status ? `status="${opts.status}"` : null,
-    ]
-      .filter(Boolean)
-      .join(' AND ');
+
+    let jql: string;
+    let orderBy = 'ORDER BY updated DESC';
+    if (opts?.history) {
+      jql = 'issue in issueHistory()';
+      orderBy = 'ORDER BY lastViewed DESC';
+    } else {
+      const clauses = [
+        projectKey ? `project="${projectKey}"` : null,
+        opts?.status ? `status="${opts.status}"` : null,
+      ].filter(Boolean);
+      jql = clauses.length > 0 ? clauses.join(' AND ') : 'assignee = currentUser()';
+    }
+
+    const fields = 'summary,status,assignee';
     const res = await fetch(
-      this.url(`/issue/search?jql=${encodeURIComponent(jql)}&maxResults=50`),
+      this.url(
+        `/search/jql?jql=${encodeURIComponent(`${jql} ${orderBy}`)}&maxResults=50&fields=${fields}`,
+      ),
       { headers: this.headers, signal: AbortSignal.timeout(10_000) },
     );
     if (!res.ok) throw new IntegrationError(`Failed to list Jira issues (${res.status})`, 'jira');

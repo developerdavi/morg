@@ -10,7 +10,7 @@ export type Ticket = {
 
 export interface TicketsProvider {
   getTicket(ticketId: string): Promise<Ticket>;
-  listTickets(opts?: { status?: string }): Promise<Ticket[]>;
+  listTickets(opts?: { status?: string; history?: boolean }): Promise<Ticket[]>;
   transitionTicket(ticketId: string, transitionName: string): Promise<void>;
   getStatuses?(): Promise<string[]>;
 }
