@@ -262,7 +262,7 @@ async function runTicketActions(
 
 async function runTickets(
   ticketId: string | undefined,
-  options: { plain?: boolean; json?: boolean; history?: boolean },
+  options: { plain?: boolean; json?: boolean },
   resolveFromBranch = false,
 ): Promise<void> {
   const projectId = await requireTrackedRepo();
@@ -314,9 +314,7 @@ async function runTickets(
   }
 
   // No ticket ID — list all tickets
-  const tickets = await withSpinner('Fetching tickets...', () =>
-    provider.listTickets({ history: options.history }),
-  );
+  const tickets = await withSpinner('Fetching tickets...', () => provider.listTickets());
 
   if (json) {
     process.stdout.write(JSON.stringify({ tickets }, null, 2) + '\n');
@@ -385,10 +383,8 @@ export function registerTicketsCommand(program: Command): void {
     .description('List all tickets, or show detail for a specific ticket')
     .option('--plain', 'Output list/detail without interactive prompts (for scripts/pipes)')
     .option('--json', 'Output as JSON (for scripting)')
-    .option('--history', 'Show recently accessed tickets (like jira issue list --history)')
-    .action(
-      (id: string | undefined, options: { plain?: boolean; json?: boolean; history?: boolean }) =>
-        runTickets(id, options, false),
+    .action((id: string | undefined, options: { plain?: boolean; json?: boolean }) =>
+      runTickets(id, options, false),
     );
 
   // `morg ticket [id]` — resolves to current branch ticket if no id given

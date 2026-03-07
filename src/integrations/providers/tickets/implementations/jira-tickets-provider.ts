@@ -216,22 +216,17 @@ export class JiraClient implements TicketsProvider {
     };
   }
 
-  async listTickets(opts?: { status?: string; history?: boolean }): Promise<Ticket[]> {
+  async listTickets(opts?: { status?: string }): Promise<Ticket[]> {
     const projectKey = this.projectConfig?.projectKey;
 
-    let jql: string;
-    let orderBy = 'ORDER BY updated DESC';
-    if (opts?.history) {
-      jql = 'issue in issueHistory()';
-      orderBy = 'ORDER BY lastViewed DESC';
-    } else {
-      const clauses = [
-        'assignee = currentUser()',
-        projectKey ? `project="${projectKey}"` : null,
-        opts?.status ? `status="${opts.status}"` : null,
-      ].filter(Boolean);
-      jql = clauses.join(' AND ');
-    }
+    const clauses = [
+      'issue in issueHistory()',
+      'assignee = currentUser()',
+      projectKey ? `project="${projectKey}"` : null,
+      opts?.status ? `status="${opts.status}"` : null,
+    ].filter(Boolean);
+    const jql = clauses.join(' AND ');
+    const orderBy = 'ORDER BY lastViewed DESC';
 
     const fields = 'summary,status,assignee,issuetype';
     const res = await fetch(

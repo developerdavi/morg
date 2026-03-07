@@ -79,7 +79,7 @@ morg status --json
 ## Managing Tickets
 
 ```bash
-# List tickets assigned to you (interactive picker)
+# List your recently viewed tickets (interactive picker)
 morg tickets
 
 # List tickets without interactive prompt
@@ -87,9 +87,6 @@ morg tickets --plain
 
 # Output as JSON
 morg tickets --json
-
-# Show recently accessed tickets (Jira only)
-morg tickets --history
 
 # View a specific ticket (interactive actions: start branch, change status, open URL)
 morg ticket MORG-42

@@ -76,10 +76,9 @@ morg status --json              # output as JSON
 ### Tickets
 
 ```bash
-morg tickets                    # list tickets assigned to you (interactive picker)
+morg tickets                    # list your recently viewed tickets (interactive picker)
 morg tickets --plain            # non-interactive table output
 morg tickets --json             # output as JSON
-morg tickets --history          # show recently accessed tickets (Jira)
 morg ticket MORG-42             # view ticket detail with action menu
 morg ticket MORG-42 --plain     # non-interactive detail view
 morg ticket --plain             # current branch's linked ticket

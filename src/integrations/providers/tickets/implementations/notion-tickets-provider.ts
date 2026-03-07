@@ -88,7 +88,7 @@ export class NotionClient implements TicketsProvider {
     return { ...ticket, description };
   }
 
-  async listTickets(opts?: { status?: string; history?: boolean }): Promise<Ticket[]> {
+  async listTickets(opts?: { status?: string }): Promise<Ticket[]> {
     const body: Record<string, unknown> = {
       sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
       page_size: 100,
