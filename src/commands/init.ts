@@ -77,14 +77,14 @@ async function runInit(): Promise<void> {
   const githubRepo = await text({
     message: 'GitHub repo (owner/name)',
     initialValue: defaultRepo,
-    validate: (v) => (v.includes('/') ? undefined : 'Format: owner/repo'),
+    validate: (v) => (v?.includes('/') ? undefined : 'Format: owner/repo'),
   });
 
   const detectedBranch = await getDefaultBranch();
   const defaultBranch = await text({
     message: 'Default branch (used as PR base and branch creation base)',
     initialValue: detectedBranch,
-    validate: (v) => (v.trim() ? undefined : 'Required'),
+    validate: (v) => (v?.trim() ? undefined : 'Required'),
   });
 
   const jiraEnabled =
@@ -96,7 +96,7 @@ async function runInit(): Promise<void> {
     const raw = await text({
       message: 'Jira project key (e.g. MORG)',
       initialValue: existingProjectConfig?.integrations.jira?.projectKey,
-      validate: (v) => (/^[A-Z][A-Z0-9]+$/i.test(v.trim()) ? undefined : 'e.g. MORG'),
+      validate: (v) => (/^[A-Z][A-Z0-9]+$/i.test(v?.trim() ?? '') ? undefined : 'e.g. MORG'),
     });
     jiraProjectKey = raw.trim().toUpperCase();
   }
@@ -112,7 +112,7 @@ async function runInit(): Promise<void> {
       placeholder: 'https://www.notion.so/My-Database-8a4b8c3d2e1f4a5b9c6d7e8f9a0b1c2d',
       initialValue: existingProjectConfig?.integrations.notion?.databaseId,
       validate: (v) => {
-        if (!v.trim()) return 'Required';
+        if (!v?.trim()) return 'Required';
         if (!NOTION_ID_RE.test(v.split('?')[0] ?? v))
           return 'Could not find a Notion ID in that URL.';
         return undefined;

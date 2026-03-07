@@ -9,13 +9,14 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
   const githubUsername = await text({
     message: 'GitHub username',
     initialValue: existing?.githubUsername,
-    validate: (v) => (v.trim() ? undefined : 'Required'),
+    validate: (v) => (v?.trim() ? undefined : 'Required'),
   });
 
   const anthropicApiKeyRaw = await text({
     message: 'Anthropic API key (sk-ant-...) — leave blank to skip',
     initialValue: existing?.anthropicApiKey ?? '',
-    validate: (v) => (!v.trim() || v.startsWith('sk-ant-') ? undefined : 'Must start with sk-ant-'),
+    validate: (v) =>
+      !v?.trim() || v.startsWith('sk-ant-') ? undefined : 'Must start with sk-ant-',
   });
   const anthropicApiKey = anthropicApiKeyRaw.trim() || undefined;
 
@@ -59,19 +60,19 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     const baseUrl = await text({
       message: 'Jira base URL (e.g. https://yourorg.atlassian.net)',
       initialValue: existing?.integrations.jira?.baseUrl,
-      validate: (v) => (v.startsWith('https://') ? undefined : 'Must be an https URL'),
+      validate: (v) => (v?.startsWith('https://') ? undefined : 'Must be an https URL'),
     });
     const userEmail = await text({
       message: 'Jira user email',
       initialValue: existing?.integrations.jira?.userEmail,
-      validate: (v) => (v.includes('@') ? undefined : 'Enter a valid email'),
+      validate: (v) => (v?.includes('@') ? undefined : 'Enter a valid email'),
     });
     const existingJiraToken = existing?.integrations.jira?.apiToken;
     const jiraApiTokenRaw = await password({
       message: existingJiraToken
         ? 'Jira API token — leave blank to keep existing'
         : 'Jira API token',
-      validate: (v) => (!v.trim() && !existingJiraToken ? 'Required' : undefined),
+      validate: (v) => (!v?.trim() && !existingJiraToken ? 'Required' : undefined),
     });
     const apiToken = jiraApiTokenRaw.trim() || existingJiraToken!;
     jiraConfig = { enabled: true, baseUrl, userEmail, apiToken };
@@ -90,7 +91,7 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
         ? 'Slack bot token (xoxb-...) — leave blank to keep existing'
         : 'Slack bot token (xoxb-...)',
       validate: (v) => {
-        if (!v.trim()) return existingSlackToken ? undefined : 'Required';
+        if (!v?.trim()) return existingSlackToken ? undefined : 'Required';
         return v.startsWith('xoxb-') ? undefined : 'Must start with xoxb-';
       },
     });
@@ -114,7 +115,7 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
       message: existingNotionToken
         ? 'Notion integration token (secret_...) — leave blank to keep existing'
         : 'Notion integration token (secret_...)',
-      validate: (v) => (!v.trim() && !existingNotionToken ? 'Required' : undefined),
+      validate: (v) => (!v?.trim() && !existingNotionToken ? 'Required' : undefined),
     });
     const apiToken = notionApiTokenRaw.trim() || existingNotionToken!;
     notionConfig = { enabled: true, apiToken };
