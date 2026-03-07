@@ -54,7 +54,7 @@ async function runPrCreate(options: {
     : await text({
         message: 'PR title',
         initialValue: options.title ?? defaultTitle,
-        validate: (v) => (v.trim() ? undefined : 'Required'),
+        validate: (v) => (v?.trim() ? undefined : 'Required'),
       });
 
   let bodyDefault = options.body ?? '';

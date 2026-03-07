@@ -33,10 +33,17 @@ describe('JiraClient', () => {
 
   describe('getTicket', () => {
     it('returns a normalized Ticket from a Jira issue', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(jiraIssuePayload),
-      }));
+      vi.stubGlobal('fetch', vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(jiraIssuePayload),
+        })
+        // getChildIssues secondary fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ issues: [] }),
+        }),
+      );
 
       const client = new JiraClient(globalConfig, projectConfig);
       const ticket = await client.getTicket('MORG-1');

@@ -35,17 +35,18 @@ ESM-native (`"type": "module"`). `"moduleResolution": "Bundler"` — no `.js` ex
 ### Layer responsibilities
 
 ```
-src/utils/errors.ts       — error classes only (MorgError, ConfigError, IntegrationError, GitError)
-src/config/paths.ts       — ~/.morg path constants only
-src/config/schemas.ts     — all Zod schemas + inferred TS types
-src/config/manager.ts     — ConfigManager singleton: reads/writes JSON state, nothing else
-src/git/index.ts          — pure git primitives via execa, no business logic
-src/utils/detect.ts       — requireConfig(), requireTrackedRepo(), detectTools()
-src/ui/                   — rendering only (theme, prompts, spinner, output panel)
-src/integrations/*/       — pure API clients (GhClient, JiraClient, SlackClient, ClaudeClient)
-src/services/registry.ts  — ServiceRegistry singleton: only place clients are instantiated
-src/commands/             — orchestration: imports from all layers, owns all business logic
-src/index.ts              — Commander wiring + preAction hook
+src/utils/errors.ts                          — error classes only (MorgError, ConfigError, IntegrationError, GitError)
+src/config/paths.ts                          — ~/.morg path constants only
+src/config/schemas.ts                        — all Zod schemas + inferred TS types
+src/config/manager.ts                        — ConfigManager singleton: reads/writes JSON state, nothing else
+src/git/index.ts                             — pure git primitives via execa, no business logic
+src/utils/detect.ts                          — requireConfig(), requireTrackedRepo(), detectTools()
+src/ui/                                      — rendering only (theme, prompts, spinner, output panel)
+src/integrations/providers/<domain>/         — provider interfaces (tickets-provider.ts, ai-provider.ts, etc.)
+src/integrations/providers/<domain>/implementations/  — concrete clients (JiraClient, GhClient, ClaudeClient, SlackClient)
+src/services/registry.ts                     — ServiceRegistry singleton: only place clients are instantiated
+src/commands/                                — orchestration: imports from all layers, owns all business logic
+src/index.ts                                 — Commander wiring + preAction hook
 ```
 
 The key constraint: **`config/manager.ts` and `git/index.ts` are leaf nodes** — they import nothing from the rest of `src/`. Circular dependencies are prevented by keeping all orchestration in `src/commands/`.
@@ -76,6 +77,15 @@ const messaging = await registry.messaging(); // MessagingProvider | null
 3. Add config schemas in `src/config/schemas.ts`
 4. Write tests in `tests/integrations/<name>.test.ts`
 5. Update this file
+
+## Jira Integration Notes
+
+- `listTickets` always includes `assignee = currentUser()` — never returns all project tickets
+- `getTicket` fetches epic children via a secondary JQL `parent = <key>` query, because
+  `fields.subtasks` only contains Sub-task type issues (not regular Features/Stories under an Epic)
+- Issue link direction: uses `type.inward` for `inwardIssue` and `type.outward` for `outwardIssue`
+  (e.g. "is blocked by" vs "blocks"), never `type.name` which has no direction
+- ADF descriptions are rendered to Markdown via `adfToMarkdown()` with link preservation
 
 ## Testing
 
