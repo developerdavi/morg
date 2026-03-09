@@ -12,6 +12,7 @@ import {
   getCurrentBranch,
   checkout,
   pullBranch,
+  fetchAndUpdateBranch,
   rebaseBranch,
   mergeBranch,
   deleteBranch,
@@ -41,12 +42,11 @@ async function runSync(options: { all?: boolean }): Promise<void> {
 
   // ── Step 1: Always pull default branch ───────────────────────────────────────
   const startBranch = await getCurrentBranch();
-  if (startBranch !== defaultBranch) {
-    await checkout(defaultBranch);
-  }
-  await withSpinner(`Pulling ${defaultBranch}...`, () => pullBranch(defaultBranch));
-  if (startBranch !== defaultBranch) {
-    await checkout(startBranch);
+  if (startBranch === defaultBranch) {
+    await withSpinner(`Pulling ${defaultBranch}...`, () => pullBranch(defaultBranch));
+  } else {
+    // Update local default branch ref via fetch without checking it out
+    await withSpinner(`Pulling ${defaultBranch}...`, () => fetchAndUpdateBranch(defaultBranch));
   }
   console.log(theme.success(`  ${symbols.success} Pulled latest ${defaultBranch}`));
 
@@ -148,6 +148,18 @@ async function runSync(options: { all?: boolean }): Promise<void> {
     const diverged = await hasDiverged(branch.branchName, defaultBranch);
     if (!diverged) continue;
 
+    const isCurrentBranch = branch.branchName === currentBranch;
+
+    // For non-current branches without a worktree we can't rebase/merge without checkout
+    if (!isCurrentBranch && !branch.worktreePath) {
+      console.log(
+        theme.muted(
+          `  ${symbols.arrow} ${branch.branchName} is behind ${defaultBranch} — switch to it to update`,
+        ),
+      );
+      continue;
+    }
+
     const action = await select<'rebase' | 'merge' | 'skip'>({
       message: `${defaultBranch} has new commits not in ${branch.branchName}. What do you want to do?`,
       options: [
@@ -159,18 +171,17 @@ async function runSync(options: { all?: boolean }): Promise<void> {
 
     if (action === 'skip') continue;
 
-    if (currentBranch !== branch.branchName) {
-      await checkout(branch.branchName);
-    }
+    // Run in the worktree directory for non-current branches; current branch uses process cwd
+    const cwd = isCurrentBranch ? undefined : (branch.worktreePath ?? undefined);
 
     try {
       if (action === 'rebase') {
-        await rebaseBranch(defaultBranch);
+        await rebaseBranch(defaultBranch, cwd);
         console.log(
           theme.success(`  ${symbols.success} Rebased ${branch.branchName} onto ${defaultBranch}`),
         );
       } else {
-        await mergeBranch(defaultBranch);
+        await mergeBranch(defaultBranch, true, cwd);
         console.log(
           theme.success(`  ${symbols.success} Merged ${defaultBranch} into ${branch.branchName}`),
         );
@@ -180,10 +191,6 @@ async function runSync(options: { all?: boolean }): Promise<void> {
       console.log(
         theme.warning(`  ${symbols.warning} ${action} failed for ${branch.branchName}: ${msg}`),
       );
-    }
-
-    if (currentBranch !== branch.branchName) {
-      await checkout(currentBranch);
     }
   }
 
