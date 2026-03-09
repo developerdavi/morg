@@ -20,6 +20,7 @@ const COMMANDS = [
   'ticket',
   'worktree',
   'completion',
+  'shell-init',
 ];
 
 function generateBashCompletion(commands: string[]): string {

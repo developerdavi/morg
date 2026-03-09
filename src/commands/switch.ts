@@ -1,4 +1,7 @@
 import type { Command } from 'commander';
+import { writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { configManager } from '../config/manager';
 import { getCurrentBranch, stashPop, checkout } from '../git/index';
 import { isTicketId, findBranchCaseInsensitive } from '../utils/ticket';
@@ -58,6 +61,16 @@ async function runSwitch(input?: string): Promise<void> {
   const branch = findBranchCaseInsensitive(branches.branches, branchName);
 
   if (branch?.worktreePath) {
+    // Signal the shell-init wrapper to cd into the worktree directory.
+    // The wrapper (installed via `eval "$(morg shell-init bash/zsh)"`) reads
+    // this file after the process exits and runs `cd` in the parent shell.
+    // Without the wrapper the fallback message below still guides the user.
+    try {
+      writeFileSync(join(tmpdir(), `morg_chdir_${process.ppid}`), branch.worktreePath);
+    } catch {
+      // Ignore — fallback message is shown regardless
+    }
+
     // Update lastAccessedAt
     branch.lastAccessedAt = new Date().toISOString();
     await configManager.saveBranches(projectId, branches);
