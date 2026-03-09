@@ -1,12 +1,13 @@
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, stashPop, checkout } from '../git/index';
+import { getCurrentBranch, stashPop, checkout, getWorktreePathForBranch } from '../git/index';
 import { isTicketId, findBranchCaseInsensitive } from '../utils/ticket';
 import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { select } from '../ui/prompts';
+import { signalWorktreeCd } from '../utils/shell';
 
 async function pickBranch(projectId: string, currentBranch: string): Promise<string> {
   const branches = await configManager.getBranches(projectId);
@@ -61,10 +62,20 @@ async function runSwitch(input?: string): Promise<void> {
     // Update lastAccessedAt
     branch.lastAccessedAt = new Date().toISOString();
     await configManager.saveBranches(projectId, branches);
+
     console.log(
       theme.success(`\n${symbols.success} Worktree branch ${theme.primaryBold(branchName)}`),
     );
-    console.log(theme.muted(`  cd ${branch.worktreePath}`));
+    signalWorktreeCd(branch.worktreePath);
+    return;
+  }
+
+  // Branch may be checked out in a worktree that morg doesn't track (e.g. main).
+  // Detect via git and cd there instead of attempting a checkout that would fail.
+  const existingWorktreePath = await getWorktreePathForBranch(branchName);
+  if (existingWorktreePath) {
+    console.log(theme.success(`\n${symbols.success} Branch ${theme.primaryBold(branchName)}`));
+    signalWorktreeCd(existingWorktreePath);
     return;
   }
 

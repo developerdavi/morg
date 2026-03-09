@@ -17,6 +17,7 @@ import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { fetchTicket, promptTicketInProgress } from '../utils/providers';
 import { registry } from '../services/registry';
+import { signalWorktreeCd } from '../utils/shell';
 
 export async function runStart(
   input: string,
@@ -95,7 +96,7 @@ export async function runStart(
     console.log(
       theme.success(`\n${symbols.success} Worktree created at ${theme.primaryBold(worktreePath)}`),
     );
-    console.log(theme.muted(`  ${symbols.arrow} cd ${worktreePath}`));
+    signalWorktreeCd(worktreePath);
   } else {
     if (exists) {
       if (currentBranch !== branchName) {

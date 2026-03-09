@@ -1,4 +1,6 @@
 import type { Command } from 'commander';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 const COMMANDS = [
   'config',
@@ -19,12 +21,40 @@ const COMMANDS = [
   'tickets',
   'ticket',
   'worktree',
-  'completion',
+  'shell-init',
 ];
 
+/**
+ * Shell function wrapper shared by bash and zsh.
+ * Sets MORG_SHELL_INIT=1 so the CLI knows the wrapper is active, then
+ * reads the temp file written by `morg switch` to cd into worktree paths.
+ */
+function wrapperFunction(): string {
+  const cdFile = join(tmpdir(), 'morg_chdir_');
+  return [
+    'morg() {',
+    '  MORG_SHELL_INIT=1 command morg "$@"',
+    '  local _morg_exit=$?',
+    `  local _morg_cd="${cdFile}$$"`,
+    '  if [[ -f "$_morg_cd" ]]; then',
+    '    local _morg_target',
+    '    _morg_target=$(cat "$_morg_cd")',
+    '    rm -f "$_morg_cd"',
+    '    if [[ -n "$_morg_target" && -d "$_morg_target" ]]; then',
+    '      cd "$_morg_target" || true',
+    '    fi',
+    '  fi',
+    '  return $_morg_exit',
+    '}',
+  ].join('\n');
+}
+
 function generateBashCompletion(commands: string[]): string {
-  return `# morg bash completion
-# Add to ~/.bashrc: eval "$(morg completion bash)"
+  return `# morg shell integration (tab completion + automatic worktree cd)
+# Add to ~/.bashrc: eval "$(morg shell-init bash)"
+
+${wrapperFunction()}
+
 _morg_completion() {
   local cur prev words
   COMPREPLY=()
@@ -73,8 +103,10 @@ complete -F _morg_completion morg`;
 
 function generateZshCompletion(commands: string[]): string {
   const commandDefs = commands.map((c) => `  '${c}'`).join('\n');
-  return `# morg zsh completion
-# Add to ~/.zshrc: eval "$(morg completion zsh)"
+  return `# morg shell integration (tab completion + automatic worktree cd)
+# Add to ~/.zshrc: eval "$(morg shell-init zsh)"
+
+${wrapperFunction()}
 
 _morg() {
   local state
@@ -145,7 +177,11 @@ ${commandDefs}
 compdef _morg morg`;
 }
 
-function runCompletion(shell: string): void {
+function runCompletion(shell: string | undefined): void {
+  if (!shell) {
+    console.error('Usage: morg shell-init <shell>  (supported: bash, zsh)');
+    process.exit(1);
+  }
   if (shell === 'bash') {
     console.log(generateBashCompletion(COMMANDS));
   } else if (shell === 'zsh') {
@@ -156,13 +192,13 @@ function runCompletion(shell: string): void {
   }
 }
 
-export function registerCompletionCommand(program: Command): void {
+export function registerShellInitCommand(program: Command): void {
   program
-    .command('completion [shell]')
-    .description('Output shell tab-completion script (bash or zsh)')
+    .command('shell-init [shell]')
+    .description('Output shell integration script (tab completion + automatic worktree cd)')
     .addHelpText(
       'after',
-      '\nInstall:\n  bash: eval "$(morg completion bash)"  # add to ~/.bashrc\n  zsh:  eval "$(morg completion zsh)"   # add to ~/.zshrc',
+      '\nInstall:\n  bash: eval "$(morg shell-init bash)"  # add to ~/.bashrc\n  zsh:  eval "$(morg shell-init zsh)"   # add to ~/.zshrc',
     )
-    .action((shell = 'bash') => runCompletion(shell));
+    .action((shell: string | undefined) => runCompletion(shell));
 }
