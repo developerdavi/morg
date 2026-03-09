@@ -9,6 +9,7 @@ import { findBranchCaseInsensitive } from '../utils/ticket';
 import { renderStatus } from '../ui/output';
 import { theme, symbols } from '../ui/theme';
 import { registry } from '../services/registry';
+import { ghPrToPrStatus } from '../integrations/providers/github/github-client';
 
 async function runStatusDetail(targetBranch: string, projectId: string): Promise<void> {
   const [branchesFile, projectConfig] = await Promise.all([
@@ -37,6 +38,25 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
     getCommitsOnBranch(defaultBranch),
     execa('git', ['diff', '--stat', `${defaultBranch}...HEAD`], { reject: false }),
   ]);
+
+  // Update registry with latest PR status while we have the data
+  if (trackedBranch && prResult.status === 'fulfilled' && prResult.value) {
+    const pr = prResult.value;
+    const prStatus = ghPrToPrStatus(pr);
+    const branchStatus = pr.mergedAt ? ('pr_merged' as const) : ('pr_open' as const);
+    if (
+      trackedBranch.prNumber !== pr.number ||
+      trackedBranch.prStatus !== prStatus ||
+      trackedBranch.status !== branchStatus
+    ) {
+      trackedBranch.prNumber = pr.number;
+      trackedBranch.prUrl = pr.url;
+      trackedBranch.prStatus = prStatus;
+      trackedBranch.status = branchStatus;
+      trackedBranch.updatedAt = new Date().toISOString();
+      await configManager.saveBranches(projectId, branchesFile);
+    }
+  }
 
   const lines: string[] = [];
 
