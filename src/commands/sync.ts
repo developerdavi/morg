@@ -107,7 +107,10 @@ async function runSync(options: { all?: boolean }): Promise<void> {
     }
     if (doDelete) {
       const currentBranch = await getCurrentBranch();
-      if (currentBranch === branch.branchName) {
+      if (currentBranch === branch.branchName && !branch.worktreePath) {
+        // Only checkout when on a regular (non-worktree) branch; for worktrees
+        // the worktree removal below is sufficient and checkout would fail if
+        // defaultBranch is already checked out in another worktree.
         await checkout(defaultBranch);
       }
       // Remove worktree first so git allows the branch to be deleted
