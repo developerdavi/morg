@@ -253,7 +253,19 @@ export class JiraClient implements TicketsProvider {
     });
   }
 
-  async getStatuses(): Promise<string[]> {
+  async getStatuses(ticketId?: string): Promise<string[]> {
+    // When a ticket ID is provided, return only the valid transitions for that specific ticket
+    if (ticketId) {
+      const res = await fetch(this.url(`/issue/${ticketId}/transitions`), {
+        headers: this.headers,
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { transitions: { name: string }[] };
+        return data.transitions.map((t) => t.name);
+      }
+    }
+    // Fallback: global project statuses
     if (this.projectConfig?.projectKey) {
       const res = await fetch(this.url(`/project/${this.projectConfig.projectKey}/statuses`), {
         headers: this.headers,
