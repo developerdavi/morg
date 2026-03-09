@@ -39,7 +39,7 @@ async function runSwitch(input?: string): Promise<void> {
     const ticketId = input.trim().toUpperCase();
     const branches = await configManager.getBranches(projectId);
     const branch = branches.branches.find(
-      (b) => b.ticketId?.toUpperCase() === ticketId && b.status === 'active',
+      (b) => b.ticketId?.toUpperCase() === ticketId && ['active', 'pr_open'].includes(b.status),
     );
     if (!branch) {
       console.error(theme.error(`No active branch found for ticket ${ticketId}.`));
