@@ -23,5 +23,5 @@ export interface TicketsProvider {
   getTicket(ticketId: string): Promise<Ticket>;
   listTickets(opts?: { status?: string }): Promise<Ticket[]>;
   transitionTicket(ticketId: string, transitionName: string): Promise<void>;
-  getStatuses?(): Promise<string[]>;
+  getStatuses?(ticketId?: string): Promise<string[]>;
 }

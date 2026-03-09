@@ -221,7 +221,7 @@ async function runTicketActions(
   }
 
   if (action === 'status') {
-    const statuses = await provider.getStatuses?.();
+    const statuses = await provider.getStatuses?.(ticket.key);
     let newStatus: string;
     if (statuses && statuses.length > 0) {
       newStatus = await select({
