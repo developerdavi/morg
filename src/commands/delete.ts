@@ -1,7 +1,15 @@
 import type { Command } from 'commander';
 import { execa } from 'execa';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, checkout, removeWorktree, branchExists } from '../git/index';
+import {
+  getCurrentBranch,
+  checkout,
+  removeWorktree,
+  branchExists,
+  getMainWorktreeRoot,
+  getWorktreePathForBranch,
+} from '../git/index';
+import { signalWorktreeCd } from '../utils/shell';
 import { requireTrackedRepo } from '../utils/detect';
 import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
@@ -46,9 +54,23 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
     process.exit(1);
   }
 
-  // If currently on the target branch, switch away first
+  // If currently on the target branch, switch away first.
+  // For worktree branches we skip checkout entirely — the worktree removal
+  // takes care of it; we then cd to the main repo root instead.
+  let cdAfterDelete: string | null = null;
   if (currentBranch === targetBranch) {
-    await withSpinner(`Switching to ${defaultBranch}...`, () => checkout(defaultBranch));
+    if (trackedBranch?.worktreePath) {
+      // We're inside the worktree being deleted — resolve where to land after
+      cdAfterDelete = await getMainWorktreeRoot();
+    } else {
+      // Regular branch — switch away; if default is in another worktree, cd there
+      const defaultWorktreePath = await getWorktreePathForBranch(defaultBranch);
+      if (defaultWorktreePath) {
+        cdAfterDelete = defaultWorktreePath;
+      } else {
+        await withSpinner(`Switching to ${defaultBranch}...`, () => checkout(defaultBranch));
+      }
+    }
   }
 
   // Remove worktree if present
@@ -75,6 +97,7 @@ async function runDelete(branch: string | undefined, options: { force?: boolean 
   }
 
   console.log(theme.success(`\n${symbols.success} Deleted ${theme.primaryBold(targetBranch)}`));
+  if (cdAfterDelete) signalWorktreeCd(cdAfterDelete);
 }
 
 export function registerDeleteCommand(program: Command): void {
