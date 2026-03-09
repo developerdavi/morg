@@ -141,9 +141,9 @@ export async function removeWorktree(worktreePath: string): Promise<void> {
   if (result.exitCode !== 0) throw new GitError(`git worktree remove failed: ${result.stderr}`);
 }
 
-export async function mergeBranch(branch: string, noFF = true): Promise<void> {
+export async function mergeBranch(branch: string, noFF = true, cwd?: string): Promise<void> {
   const args = noFF ? ['merge', '--no-ff', branch] : ['merge', branch];
-  const result = await execa('git', args, { reject: false });
+  const result = await execa('git', args, { reject: false, ...(cwd ? { cwd } : {}) });
   if (result.exitCode !== 0) throw new GitError(`git merge failed: ${result.stderr}`);
 }
 
@@ -188,7 +188,7 @@ export async function getWorktreePathForBranch(branch: string): Promise<string |
   return null;
 }
 
-export async function rebaseBranch(onto: string): Promise<void> {
-  const result = await execa('git', ['rebase', onto], { reject: false });
+export async function rebaseBranch(onto: string, cwd?: string): Promise<void> {
+  const result = await execa('git', ['rebase', onto], { reject: false, ...(cwd ? { cwd } : {}) });
   if (result.exitCode !== 0) throw new GitError(`git rebase failed: ${result.stderr}`);
 }
