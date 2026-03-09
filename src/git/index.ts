@@ -167,6 +167,27 @@ export async function fetchAndUpdateBranch(branch: string): Promise<boolean> {
   return result.exitCode === 0;
 }
 
+/**
+ * Returns the worktree path that has the given branch checked out, or null
+ * if the branch is not checked out in any worktree.
+ * Parses `git worktree list --porcelain` output.
+ */
+export async function getWorktreePathForBranch(branch: string): Promise<string | null> {
+  const result = await execa('git', ['worktree', 'list', '--porcelain'], { reject: false });
+  if (result.exitCode !== 0) return null;
+
+  let currentPath: string | null = null;
+  for (const line of result.stdout.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      currentPath = line.slice('worktree '.length).trim();
+    } else if (line.startsWith('branch refs/heads/')) {
+      const checkedOutBranch = line.slice('branch refs/heads/'.length).trim();
+      if (checkedOutBranch === branch) return currentPath;
+    }
+  }
+  return null;
+}
+
 export async function rebaseBranch(onto: string): Promise<void> {
   const result = await execa('git', ['rebase', onto], { reject: false });
   if (result.exitCode !== 0) throw new GitError(`git rebase failed: ${result.stderr}`);

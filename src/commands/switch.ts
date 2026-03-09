@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { configManager } from '../config/manager';
-import { getCurrentBranch, stashPop, checkout } from '../git/index';
+import { getCurrentBranch, stashPop, checkout, getWorktreePathForBranch } from '../git/index';
 import { isTicketId, findBranchCaseInsensitive } from '../utils/ticket';
 import { handleDirtyTree } from '../utils/stash';
 import { requireTrackedRepo } from '../utils/detect';
@@ -67,6 +67,15 @@ async function runSwitch(input?: string): Promise<void> {
       theme.success(`\n${symbols.success} Worktree branch ${theme.primaryBold(branchName)}`),
     );
     signalWorktreeCd(branch.worktreePath);
+    return;
+  }
+
+  // Branch may be checked out in a worktree that morg doesn't track (e.g. main).
+  // Detect via git and cd there instead of attempting a checkout that would fail.
+  const existingWorktreePath = await getWorktreePathForBranch(branchName);
+  if (existingWorktreePath) {
+    console.log(theme.success(`\n${symbols.success} Branch ${theme.primaryBold(branchName)}`));
+    signalWorktreeCd(existingWorktreePath);
     return;
   }
 
