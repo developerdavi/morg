@@ -8,11 +8,13 @@ import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { confirm, select } from '../ui/prompts';
 import { promptTicketDone } from '../utils/providers';
+import { signalWorktreeCd } from '../utils/shell';
 import {
   getCurrentBranch,
   checkout,
   pullBranch,
   fetchAndUpdateBranch,
+  getMainWorktreeRoot,
   rebaseBranch,
   mergeBranch,
   deleteBranch,
@@ -107,11 +109,15 @@ async function runSync(options: { all?: boolean }): Promise<void> {
     }
     if (doDelete) {
       const currentBranch = await getCurrentBranch();
-      if (currentBranch === branch.branchName && !branch.worktreePath) {
-        // Only checkout when on a regular (non-worktree) branch; for worktrees
-        // the worktree removal below is sufficient and checkout would fail if
-        // defaultBranch is already checked out in another worktree.
-        await checkout(defaultBranch);
+      if (currentBranch === branch.branchName) {
+        if (branch.worktreePath) {
+          // Can't checkout — defaultBranch is already used by the main worktree.
+          // Signal the shell wrapper (or print a hint) to cd there instead.
+          const mainRoot = await getMainWorktreeRoot();
+          signalWorktreeCd(mainRoot);
+        } else {
+          await checkout(defaultBranch);
+        }
       }
       // Remove worktree first so git allows the branch to be deleted
       if (branch.worktreePath) {
