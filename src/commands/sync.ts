@@ -112,8 +112,10 @@ async function runSync(options: { all?: boolean }): Promise<void> {
       if (currentBranch === branch.branchName) {
         if (branch.worktreePath) {
           // Can't checkout — defaultBranch is already used by the main worktree.
-          // Signal the shell wrapper (or print a hint) to cd there instead.
+          // Move the process out of the worktree directory before it's removed so
+          // subsequent git commands keep working, then signal the shell to cd there.
           const mainRoot = await getMainWorktreeRoot();
+          process.chdir(mainRoot);
           signalWorktreeCd(mainRoot);
         } else {
           await checkout(defaultBranch);
