@@ -1,7 +1,4 @@
 import type { Command } from 'commander';
-import { writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import { configManager } from '../config/manager';
 import { getCurrentBranch, stashPop, checkout } from '../git/index';
 import { isTicketId, findBranchCaseInsensitive } from '../utils/ticket';
@@ -10,6 +7,7 @@ import { requireTrackedRepo } from '../utils/detect';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
 import { select } from '../ui/prompts';
+import { signalWorktreeCd } from '../utils/shell';
 
 async function pickBranch(projectId: string, currentBranch: string): Promise<string> {
   const branches = await configManager.getBranches(projectId);
@@ -61,23 +59,14 @@ async function runSwitch(input?: string): Promise<void> {
   const branch = findBranchCaseInsensitive(branches.branches, branchName);
 
   if (branch?.worktreePath) {
-    // Signal the shell-init wrapper to cd into the worktree directory.
-    // The wrapper (installed via `eval "$(morg shell-init bash/zsh)"`) reads
-    // this file after the process exits and runs `cd` in the parent shell.
-    // Without the wrapper the fallback message below still guides the user.
-    try {
-      writeFileSync(join(tmpdir(), `morg_chdir_${process.ppid}`), branch.worktreePath);
-    } catch {
-      // Ignore — fallback message is shown regardless
-    }
-
     // Update lastAccessedAt
     branch.lastAccessedAt = new Date().toISOString();
     await configManager.saveBranches(projectId, branches);
+
     console.log(
       theme.success(`\n${symbols.success} Worktree branch ${theme.primaryBold(branchName)}`),
     );
-    console.log(theme.muted(`  cd ${branch.worktreePath}`));
+    signalWorktreeCd(branch.worktreePath);
     return;
   }
 
