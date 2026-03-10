@@ -6,12 +6,12 @@ import { getCurrentBranch, getCommitsOnBranch } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
 import { fetchTicket } from '../utils/providers';
 import { findBranchCaseInsensitive } from '../utils/ticket';
-import { renderStatus } from '../ui/output';
+import { renderBranches } from '../ui/output';
 import { theme, symbols } from '../ui/theme';
 import { registry } from '../services/registry';
 import { ghPrToPrStatus } from '../integrations/providers/github/github-client';
 
-async function runStatusDetail(targetBranch: string, projectId: string): Promise<void> {
+export async function runStatusDetail(targetBranch: string, projectId: string): Promise<void> {
   const [branchesFile, projectConfig] = await Promise.all([
     configManager.getBranches(projectId),
     configManager.getProjectConfig(projectId),
@@ -21,7 +21,7 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
 
   // Don't fetch details for untracked branches — show the all-branches table instead
   if (!trackedBranch) {
-    await renderStatus();
+    await renderBranches();
     return;
   }
 
@@ -146,7 +146,7 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
 }
 
 export async function runStatus(): Promise<void> {
-  await renderStatus();
+  await renderBranches();
 }
 
 export function registerStatusCommand(program: Command): void {
@@ -162,7 +162,7 @@ export function registerStatusCommand(program: Command): void {
         options: { branch?: string; short?: boolean; json?: boolean },
       ) => {
         if (options.short) {
-          return renderStatus({ branch: options.branch, short: true });
+          return renderBranches({ branch: options.branch, short: true });
         }
         let projectId: string;
         try {

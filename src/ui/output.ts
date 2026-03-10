@@ -63,7 +63,7 @@ const TABLE_CHARS = {
   middle: '│',
 };
 
-export async function renderStatus(opts?: { branch?: string; short?: boolean }): Promise<void> {
+export async function renderBranches(opts?: { branch?: string; short?: boolean }): Promise<void> {
   let projectId: string;
   try {
     projectId = await requireTrackedRepo();

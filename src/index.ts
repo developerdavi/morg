@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { handleError } from './utils/errors';
-import { requireConfig } from './utils/detect';
+import { requireConfig, requireTrackedRepo } from './utils/detect';
 import { registerConfigCommand } from './commands/config';
 import { registerInitCommand } from './commands/init';
 import { registerStartCommand } from './commands/start';
@@ -9,7 +9,8 @@ import { registerUntrackCommand } from './commands/untrack';
 import { registerSwitchCommand } from './commands/switch';
 import { registerPrCommand } from './commands/pr';
 import { registerSyncCommand } from './commands/sync';
-import { registerStatusCommand, runStatus } from './commands/status';
+import { registerStatusCommand, runStatusDetail } from './commands/status';
+import { registerLsCommand } from './commands/ls';
 import { registerStandupCommand } from './commands/standup';
 import { registerPromptCommand } from './commands/prompt';
 import { registerUpdateCommand } from './commands/update';
@@ -20,12 +21,35 @@ import { registerTicketsCommand } from './commands/tickets';
 import { registerInstallClaudeSkillCommand } from './commands/install-claude-skill';
 import { registerShellInitCommand } from './commands/shell-init';
 import { registerWorktreeCommand } from './commands/worktree';
+import { getCurrentBranch } from './git/index';
+import { configManager } from './config/manager';
+import { findBranchCaseInsensitive } from './utils/ticket';
+import { renderBranches } from './ui/output';
+import { theme } from './ui/theme';
 
 const program = new Command();
 
 program.name('morg').description('Developer productivity assistant').version('0.1.0');
 
-program.action(() => runStatus());
+program.action(async () => {
+  try {
+    const projectId = await requireTrackedRepo();
+    const currentBranch = await getCurrentBranch();
+    const branchesFile = await configManager.getBranches(projectId);
+    const trackedBranch = findBranchCaseInsensitive(branchesFile.branches, currentBranch);
+
+    if (trackedBranch) {
+      await runStatusDetail(currentBranch, projectId);
+    } else {
+      await renderBranches();
+      console.log(
+        theme.muted(`\nCurrent branch "${currentBranch}" is not being tracked. → morg track`),
+      );
+    }
+  } catch {
+    await renderBranches();
+  }
+});
 
 const NO_CONFIG_COMMANDS = new Set(['config', 'install-claude-skill', 'shell-init']);
 program.hook('preAction', async (_thisCommand, actionCommand) => {
@@ -41,6 +65,7 @@ registerSwitchCommand(program);
 registerPrCommand(program);
 registerSyncCommand(program);
 registerStatusCommand(program);
+registerLsCommand(program);
 registerStandupCommand(program);
 registerPromptCommand(program);
 registerUpdateCommand(program);
