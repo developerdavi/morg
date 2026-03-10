@@ -32,14 +32,14 @@ describe('ClaudeCLIProvider', () => {
     expect(args).toContain('--print');
   });
 
-  it('includes prompt as last arg', async () => {
+  it('passes prompt via stdin input option', async () => {
     mockExeca.mockResolvedValueOnce({ exitCode: 0, stdout: 'ok', stderr: '' });
 
     const provider = new ClaudeCLIProvider();
     await provider.complete('my prompt');
 
-    const [, args] = mockExeca.mock.calls[0] as [string, string[]];
-    expect(args[args.length - 1]).toBe('my prompt');
+    const [, , opts] = mockExeca.mock.calls[0] as [string, string[], { input: string }];
+    expect(opts.input).toBe('my prompt');
   });
 
   it('passes --system-prompt arg when systemPrompt is provided', async () => {
