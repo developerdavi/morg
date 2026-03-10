@@ -12,22 +12,26 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     validate: (v) => (v?.trim() ? undefined : 'Required'),
   });
 
-  const anthropicApiKeyRaw = await text({
-    message: 'Anthropic API key (sk-ant-...) — leave blank to skip',
-    initialValue: existing?.anthropicApiKey ?? '',
-    validate: (v) =>
-      !v?.trim() || v.startsWith('sk-ant-') ? undefined : 'Must start with sk-ant-',
-  });
-  const anthropicApiKey = anthropicApiKeyRaw.trim() || undefined;
-
   const aiProvider = (await select({
     message: 'AI provider',
     options: [
-      { value: 'anthropic-api', label: 'Anthropic API (use API key above)' },
-      { value: 'claude-cli', label: 'Claude CLI (use local claude binary)' },
+      { value: 'none', label: 'None (disable AI features)' },
+      { value: 'anthropic-api', label: 'Anthropic API (API key)' },
+      { value: 'claude-cli', label: 'Claude CLI (local claude binary)' },
     ],
-    initialValue: existing?.aiProvider ?? 'anthropic-api',
-  })) as GlobalConfig['aiProvider'];
+    initialValue: (existing?.aiProvider ?? existing?.anthropicApiKey) ? 'anthropic-api' : 'none',
+  })) as GlobalConfig['aiProvider'] | 'none';
+
+  let anthropicApiKey: string | undefined;
+  if (aiProvider === 'anthropic-api') {
+    const raw = await text({
+      message: 'Anthropic API key (sk-ant-...)',
+      initialValue: existing?.anthropicApiKey ?? '',
+      validate: (v) =>
+        !v?.trim() || v.startsWith('sk-ant-') ? undefined : 'Must start with sk-ant-',
+    });
+    anthropicApiKey = raw.trim() || undefined;
+  }
 
   const autoStash = await select({
     message: 'Auto-stash dirty working tree on branch switch?',
@@ -134,7 +138,7 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     version: 1,
     githubUsername,
     anthropicApiKey,
-    aiProvider,
+    aiProvider: aiProvider === 'none' ? undefined : aiProvider,
     autoStash,
     lastStashChoice: existing?.lastStashChoice,
     autoDeleteMerged,
