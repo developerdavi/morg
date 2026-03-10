@@ -20,6 +20,15 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
   });
   const anthropicApiKey = anthropicApiKeyRaw.trim() || undefined;
 
+  const aiProvider = (await select({
+    message: 'AI provider',
+    options: [
+      { value: 'anthropic-api', label: 'Anthropic API (use API key above)' },
+      { value: 'claude-cli', label: 'Claude CLI (use local claude binary)' },
+    ],
+    initialValue: existing?.aiProvider ?? 'anthropic-api',
+  })) as GlobalConfig['aiProvider'];
+
   const autoStash = await select({
     message: 'Auto-stash dirty working tree on branch switch?',
     options: [
@@ -125,6 +134,7 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     version: 1,
     githubUsername,
     anthropicApiKey,
+    aiProvider,
     autoStash,
     lastStashChoice: existing?.lastStashChoice,
     autoDeleteMerged,
@@ -162,6 +172,7 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     console.log(`  githubUsername:  ${theme.primary(config.githubUsername)}`);
     if (config.anthropicApiKey)
       console.log(`  anthropicApiKey: ${theme.muted(redact(config.anthropicApiKey))}`);
+    if (config.aiProvider) console.log(`  aiProvider:      ${theme.primary(config.aiProvider)}`);
     console.log(`  autoStash:            ${theme.primary(config.autoStash)}`);
     console.log(`  autoDeleteMerged:     ${theme.primary(config.autoDeleteMerged)}`);
     console.log(`  autoUpdateTicketStatus: ${theme.primary(config.autoUpdateTicketStatus)}`);

@@ -4,6 +4,7 @@ import { GhClient } from '../integrations/providers/github/github-client';
 import { JiraClient } from '../integrations/providers/tickets/implementations/jira-tickets-provider';
 import { NotionClient } from '../integrations/providers/tickets/implementations/notion-tickets-provider';
 import { ClaudeClient } from '../integrations/providers/ai/implementations/claude-ai-provider';
+import { ClaudeCLIProvider } from '../integrations/providers/ai/implementations/claude-cli-ai-provider';
 import { SlackClient } from '../integrations/providers/messaging/implementations/slack-messaging-provider';
 import type { TicketsProvider } from '../integrations/providers/tickets/tickets-provider';
 import type { AIProvider } from '../integrations/providers/ai/ai-provider';
@@ -41,6 +42,7 @@ class Registry {
 
   async ai(): Promise<AIProvider | null> {
     const globalConfig = await configManager.getGlobalConfig(await this.pid());
+    if (globalConfig.aiProvider === 'claude-cli') return new ClaudeCLIProvider();
     return globalConfig.anthropicApiKey ? new ClaudeClient(globalConfig.anthropicApiKey) : null;
   }
 
