@@ -1,4 +1,5 @@
 import * as clack from '@clack/prompts';
+import inquirerEditor from '@inquirer/editor';
 
 export function intro(title: string): void {
   clack.intro(title);
@@ -56,6 +57,10 @@ export async function select<T extends string>(opts: {
     process.exit(0);
   }
   return result as T;
+}
+
+export async function editor(opts: { message: string; initialValue?: string }): Promise<string> {
+  return inquirerEditor({ message: opts.message, default: opts.initialValue });
 }
 
 export { clack };
