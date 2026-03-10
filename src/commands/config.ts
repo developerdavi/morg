@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { configManager } from '../config/manager';
 import type { GlobalConfig } from '../config/schemas';
 import { theme, symbols } from '../ui/theme';
-import { intro, outro, text, password, confirm, select } from '../ui/prompts';
+import { intro, outro, text, password, select, multiselect } from '../ui/prompts';
 import { requireTrackedRepo } from '../utils/detect';
 
 async function runConfigWizard(existing: GlobalConfig | undefined): Promise<GlobalConfig> {
@@ -63,13 +63,24 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     initialValue: existing?.autoUpdateTicketStatus ?? 'ask',
   });
 
-  const enableJira = await confirm({
-    message: 'Enable Jira integration?',
-    initialValue: existing?.integrations.jira?.enabled ?? false,
+  type Integration = 'jira' | 'notion' | 'slack';
+  const currentIntegrations: Integration[] = [];
+  if (existing?.integrations.jira?.enabled) currentIntegrations.push('jira');
+  if (existing?.integrations.notion?.enabled) currentIntegrations.push('notion');
+  if (existing?.integrations.slack?.enabled) currentIntegrations.push('slack');
+
+  const enabledIntegrations = await multiselect<Integration>({
+    message: 'Integrations to enable (space to toggle)',
+    options: [
+      { value: 'jira', label: 'Jira', hint: 'tickets provider' },
+      { value: 'notion', label: 'Notion', hint: 'tickets provider' },
+      { value: 'slack', label: 'Slack', hint: 'messaging / standup' },
+    ],
+    initialValues: currentIntegrations,
   });
 
   let jiraConfig: GlobalConfig['integrations']['jira'] = undefined;
-  if (enableJira) {
+  if (enabledIntegrations.includes('jira')) {
     const baseUrl = await text({
       message: 'Jira base URL (e.g. https://yourorg.atlassian.net)',
       initialValue: existing?.integrations.jira?.baseUrl,
@@ -91,13 +102,21 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     jiraConfig = { enabled: true, baseUrl, userEmail, apiToken };
   }
 
-  const enableSlack = await confirm({
-    message: 'Enable Slack integration?',
-    initialValue: existing?.integrations.slack?.enabled ?? false,
-  });
+  let notionConfig: GlobalConfig['integrations']['notion'] = undefined;
+  if (enabledIntegrations.includes('notion')) {
+    const existingNotionToken = existing?.integrations.notion?.apiToken;
+    const notionApiTokenRaw = await password({
+      message: existingNotionToken
+        ? 'Notion integration token (secret_...) — leave blank to keep existing'
+        : 'Notion integration token (secret_...)',
+      validate: (v) => (!v?.trim() && !existingNotionToken ? 'Required' : undefined),
+    });
+    const apiToken = notionApiTokenRaw.trim() || existingNotionToken!;
+    notionConfig = { enabled: true, apiToken };
+  }
 
   let slackConfig: GlobalConfig['integrations']['slack'] = undefined;
-  if (enableSlack) {
+  if (enabledIntegrations.includes('slack')) {
     const existingSlackToken = existing?.integrations.slack?.apiToken;
     const slackApiTokenRaw = await password({
       message: existingSlackToken
@@ -114,24 +133,6 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
       initialValue: existing?.integrations.slack?.standupChannel ?? '',
     });
     slackConfig = { enabled: true, apiToken, standupChannel: standupChannel.trim() || undefined };
-  }
-
-  const enableNotion = await confirm({
-    message: 'Enable Notion integration?',
-    initialValue: existing?.integrations.notion?.enabled ?? false,
-  });
-
-  let notionConfig: GlobalConfig['integrations']['notion'] = undefined;
-  if (enableNotion) {
-    const existingNotionToken = existing?.integrations.notion?.apiToken;
-    const notionApiTokenRaw = await password({
-      message: existingNotionToken
-        ? 'Notion integration token (secret_...) — leave blank to keep existing'
-        : 'Notion integration token (secret_...)',
-      validate: (v) => (!v?.trim() && !existingNotionToken ? 'Required' : undefined),
-    });
-    const apiToken = notionApiTokenRaw.trim() || existingNotionToken!;
-    notionConfig = { enabled: true, apiToken };
   }
 
   return {
