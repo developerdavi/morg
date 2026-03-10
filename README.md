@@ -44,9 +44,12 @@ morg init     # initialize the current repo
 
 | Integration | Credential |
 |-------------|-----------|
-| Claude | Anthropic API key (`sk-ant-...`) |
+| Claude (API) | Anthropic API key (`sk-ant-...`) |
+| Claude (CLI) | None — uses the locally installed `claude` CLI |
 | Jira | Base URL + user email + API token |
 | Slack | Bot token (`xoxb-...`) with `chat:write` scope |
+
+`morg config` lets you choose between `anthropic-api`, `claude-cli`, or `none` as the AI provider.
 
 ## Commands
 
@@ -91,7 +94,7 @@ description rendered as Markdown with clickable links.
 ### Pull requests
 
 ```bash
-morg pr create                  # create PR (Claude writes the description by default)
+morg pr create                  # create PR; Claude writes the description, opens $EDITOR to edit
 morg pr create --no-ai          # create PR with empty description
 morg pr create --draft          # create as draft
 morg pr create --title "..." --body "..." --yes  # non-interactive
