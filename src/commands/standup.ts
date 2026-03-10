@@ -27,8 +27,8 @@ async function runStandup(options: { post?: boolean; channel?: string }): Promis
   const ai = await registry.ai();
   if (!ai) {
     console.error(
-      theme.error('Anthropic API key is required for standup.'),
-      theme.muted('Run: morg config'),
+      theme.error('An AI provider is required for standup.'),
+      theme.muted('Run: morg config  — set an Anthropic API key or enable Claude CLI'),
     );
     process.exit(1);
   }
