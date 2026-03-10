@@ -176,15 +176,22 @@ worktree (if applicable).
 ## Viewing Status
 
 ```bash
-# Show detail for the current branch: ticket info, GitHub PR status, CI checks,
-# recent git commits, diff to main
+# Context-aware default: detail if on a tracked branch, table otherwise
+morg
+
+# List all active branches with PR and CI badges
+morg ls
+morg branches   # alias
+
+# Detail for current branch: ticket, PR, CI checks, recent commits, diff to base
 morg status
 
-# Show all tracked branches as a JSON array (for scripting)
-morg status --json
-
-# Show detail for a specific branch
+# Detail for a specific branch (accepts ticket ID or branch name, case-insensitive)
 morg status <branch>
+morg status MORG-42
+
+# All tracked branches as JSON (for scripting)
+morg status --json
 ```
 
 ## Managing Tickets
@@ -476,7 +483,8 @@ morg sync
 ### Checking in on all work
 
 ```bash
-morg status
+morg ls        # table of all active branches
+morg status    # detail for current branch (if tracked)
 ```
 
 ## Notes

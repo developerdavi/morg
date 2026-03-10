@@ -9,7 +9,9 @@ Developer productivity CLI that connects GitHub, Jira, Slack, and Claude to redu
 - Stashes/restores work when switching between tasks
 - Generates AI-written PR descriptions and review summaries via Claude
 - Generates standup updates from recent git activity and posts them to Slack
-- Shows a live task dashboard (`morg status`) with PR and CI state
+- Context-aware `morg`: shows branch detail on a tracked branch, or the full branch table otherwise
+- Live branch detail (`morg status`) with ticket, PR, CI state, commits, and diff summary
+- Branch table (`morg ls`) listing all active tasks at a glance
 - Rich ticket detail view: parent, child issues, issue links, Markdown description
 
 ## Prerequisites
@@ -72,8 +74,11 @@ morg clean                      # bulk-delete all fully-merged branches
 ### Status
 
 ```bash
-morg status                     # table of active tasks with PR and CI badges
-morg status --json              # output as JSON
+morg                            # context-aware: detail if on a tracked branch, table otherwise
+morg ls                         # table of all active branches with PR and CI badges (alias: branches)
+morg status                     # detail for current branch: ticket, PR, CI, commits, diff
+morg status <branch>            # detail for a specific branch (accepts ticket ID, case-insensitive)
+morg status --json              # all tracked branches as JSON
 ```
 
 ### Tickets
