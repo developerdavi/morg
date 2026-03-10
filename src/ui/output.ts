@@ -100,7 +100,7 @@ export async function renderBranches(opts?: { branch?: string; short?: boolean }
           padding: 1,
           borderStyle: 'round',
           borderColor: 'gray',
-          title: theme.primaryBold('morg status'),
+          title: theme.primaryBold('morg ls'),
           titleAlignment: 'left',
         },
       ),
@@ -142,7 +142,7 @@ export async function renderBranches(opts?: { branch?: string; short?: boolean }
   }
 
   console.log('');
-  console.log(theme.primaryBold('  morg status'));
+  console.log(theme.primaryBold('  morg ls'));
   console.log(table.toString());
   console.log('');
 }
