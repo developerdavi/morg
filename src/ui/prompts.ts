@@ -31,7 +31,7 @@ export async function password(opts: {
     clack.cancel('Operation cancelled.');
     process.exit(0);
   }
-  return result;
+  return result ?? '';
 }
 
 export async function confirm(opts: { message: string; initialValue?: boolean }): Promise<boolean> {
