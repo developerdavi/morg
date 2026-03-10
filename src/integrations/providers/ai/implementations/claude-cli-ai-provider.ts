@@ -4,7 +4,7 @@ import { IntegrationError } from '../../../../utils/errors';
 
 export class ClaudeCLIProvider implements AIProvider {
   async complete(prompt: string, systemPrompt?: string): Promise<string> {
-    const args = ['--print', '--no-session-persistence', prompt];
+    const args = ['--print', prompt];
     if (systemPrompt) args.unshift('--system-prompt', systemPrompt);
 
     let result;

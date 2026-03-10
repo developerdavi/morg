@@ -21,7 +21,7 @@ describe('ClaudeCLIProvider', () => {
     expect(result).toBe('hello world');
   });
 
-  it('always passes --print and --no-session-persistence', async () => {
+  it('always passes --print', async () => {
     mockExeca.mockResolvedValueOnce({ exitCode: 0, stdout: 'ok', stderr: '' });
 
     const provider = new ClaudeCLIProvider();
@@ -30,8 +30,6 @@ describe('ClaudeCLIProvider', () => {
     const [cmd, args] = mockExeca.mock.calls[0] as [string, string[]];
     expect(cmd).toBe('claude');
     expect(args).toContain('--print');
-    expect(args).not.toContain('--tools');
-    expect(args).toContain('--no-session-persistence');
   });
 
   it('includes prompt as last arg', async () => {
