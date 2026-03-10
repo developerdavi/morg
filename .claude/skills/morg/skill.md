@@ -14,6 +14,45 @@ allowed-tools: Bash
 `morg` is a developer productivity CLI that connects git branches with tickets
 (Jira or Notion) and GitHub PRs.
 
+## MANDATORY WORKFLOW — Always Follow This
+
+**CRITICAL**: When asked to implement tickets (e.g. "implement MORG-52"), you MUST use the full
+morg lifecycle. Never make code changes directly on `main` or without a branch.
+
+### Required steps for every ticket:
+
+```bash
+# 1. Get context
+morg ticket MORG-XX --plain
+
+# 2. Start the branch (BEFORE making any code changes)
+morg start MORG-XX
+
+# 3. Make your code changes
+
+# 4. Commit (git add + git commit)
+
+# 5. Create the PR
+morg pr create --title "type(MORG-XX): description" --body "..." --yes
+```
+
+**If asked to implement multiple tickets in sequence**:
+- In sequence means: not in parallel, not in worktrees
+- Do the full lifecycle (start → code → commit → PR) for ticket 1
+- Do the full lifecycle for ticket 2
+- Repeat until all tickets are implemented
+
+**If asked to implement one or more tickets in parallel**:
+- In parallel means: in worktrees, in parallel branches
+- Spawn agents to work on the tickets in parallel
+- Do the full lifecycle for each ticket, using worktree branches
+
+**Never**:
+- Edit files before running `morg start`
+- Work directly on `main`
+- Skip `morg pr create` after finishing a ticket
+- Use `git checkout -b`, `gh pr create`, or `git checkout main` directly
+
 ## Always Use morg (Never Raw git/gh)
 
 | Task | ❌ Never | ✓ Always |
