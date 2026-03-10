@@ -19,13 +19,18 @@ export async function runStatusDetail(targetBranch: string, projectId: string): 
 
   const trackedBranch = findBranchCaseInsensitive(branchesFile.branches, targetBranch);
 
-  // Don't fetch details for untracked branches — show the all-branches table instead
+  const defaultBranch = projectConfig.defaultBranch;
+
   if (!trackedBranch) {
-    await renderBranches();
+    console.log(theme.muted(`Branch "${targetBranch}" is not being tracked.`));
+    if (targetBranch !== defaultBranch) {
+      console.log(theme.muted(`  ${symbols.arrow} morg track              to start tracking it`));
+    }
+    console.log(
+      theme.muted(`  ${symbols.arrow} morg status <branch>   to check a specific branch`),
+    );
     return;
   }
-
-  const defaultBranch = projectConfig.defaultBranch;
 
   const ticketsProvider = await registry.tickets();
   const gh = projectConfig.integrations.github?.enabled !== false ? await registry.gh() : null;
