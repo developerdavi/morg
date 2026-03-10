@@ -7,9 +7,13 @@ export class ClaudeCLIProvider implements AIProvider {
     const args: string[] = ['--print'];
     if (systemPrompt) args.push('--system-prompt', systemPrompt);
 
+    const env = { ...process.env };
+    delete env['CLAUDECODE'];
+    delete env['CLAUDE_CODE_ENTRYPOINT'];
+
     let result;
     try {
-      result = await execa('claude', args, { input: prompt, reject: false });
+      result = await execa('claude', args, { input: prompt, reject: false, env });
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new IntegrationError(
