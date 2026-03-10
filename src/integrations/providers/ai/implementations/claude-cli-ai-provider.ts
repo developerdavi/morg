@@ -4,12 +4,12 @@ import { IntegrationError } from '../../../../utils/errors';
 
 export class ClaudeCLIProvider implements AIProvider {
   async complete(prompt: string, systemPrompt?: string): Promise<string> {
-    const args = ['--print', prompt];
-    if (systemPrompt) args.unshift('--system-prompt', systemPrompt);
+    const args: string[] = ['--print'];
+    if (systemPrompt) args.push('--system-prompt', systemPrompt);
 
     let result;
     try {
-      result = await execa('claude', args, { reject: false });
+      result = await execa('claude', args, { input: prompt, reject: false });
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new IntegrationError(
