@@ -62,6 +62,21 @@ export async function select<T extends string>(opts: {
   return result as T;
 }
 
+export async function multiselect<T extends string>(opts: {
+  message: string;
+  options: { value: T; label: string; hint?: string }[];
+  initialValues?: T[];
+  required?: boolean;
+}): Promise<T[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await clack.multiselect({ required: false, ...opts } as any);
+  if (clack.isCancel(result)) {
+    clack.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+  return result as T[];
+}
+
 export async function editor(opts: { message: string; initialValue?: string }): Promise<string> {
   const tmpFile = join(tmpdir(), `morg-${Date.now()}.md`);
   writeFileSync(tmpFile, opts.initialValue ?? '', 'utf-8');
