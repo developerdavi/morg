@@ -34,17 +34,22 @@ program.name('morg').description('Developer productivity assistant').version('0.
 program.action(async () => {
   try {
     const projectId = await requireTrackedRepo();
-    const currentBranch = await getCurrentBranch();
-    const branchesFile = await configManager.getBranches(projectId);
+    const [currentBranch, branchesFile, projectConfig] = await Promise.all([
+      getCurrentBranch(),
+      configManager.getBranches(projectId),
+      configManager.getProjectConfig(projectId),
+    ]);
     const trackedBranch = findBranchCaseInsensitive(branchesFile.branches, currentBranch);
 
     if (trackedBranch) {
       await runStatusDetail(currentBranch, projectId);
     } else {
       await renderBranches();
-      console.log(
-        theme.muted(`\nCurrent branch "${currentBranch}" is not being tracked. → morg track`),
-      );
+      if (currentBranch !== projectConfig.defaultBranch) {
+        console.log(
+          theme.muted(`\nCurrent branch "${currentBranch}" is not being tracked. → morg track`),
+        );
+      }
     }
   } catch {
     await renderBranches();
