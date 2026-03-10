@@ -107,6 +107,10 @@ All JSON state is read/written exclusively through `configManager` (never direct
 1. Create `src/commands/<name>.ts` with a `register<Name>Command(program: Command)` export
 2. Implement the logic in a private `async function run<Name>()` in the same file
 3. Add static import + `register<Name>Command(program)` call in `src/index.ts`
+4. **Always keep these in sync** whenever adding, removing, or renaming commands:
+   - `README.md` — Commands section
+   - `.claude/skills/morg/skill.md` — relevant section(s)
+   - `src/commands/shell-init.ts` — `COMMANDS` array (tab completion)
 
 Commands that require a tracked repo call `requireTrackedRepo()` to get the `projectId`, then use `configManager.getBranches(projectId)` etc.
 

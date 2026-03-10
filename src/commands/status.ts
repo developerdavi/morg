@@ -6,12 +6,12 @@ import { getCurrentBranch, getCommitsOnBranch } from '../git/index';
 import { requireTrackedRepo } from '../utils/detect';
 import { fetchTicket } from '../utils/providers';
 import { findBranchCaseInsensitive } from '../utils/ticket';
-import { renderStatus } from '../ui/output';
+import { renderBranches } from '../ui/output';
 import { theme, symbols } from '../ui/theme';
 import { registry } from '../services/registry';
 import { ghPrToPrStatus } from '../integrations/providers/github/github-client';
 
-async function runStatusDetail(targetBranch: string, projectId: string): Promise<void> {
+export async function runStatusDetail(targetBranch: string, projectId: string): Promise<void> {
   const [branchesFile, projectConfig] = await Promise.all([
     configManager.getBranches(projectId),
     configManager.getProjectConfig(projectId),
@@ -19,13 +19,18 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
 
   const trackedBranch = findBranchCaseInsensitive(branchesFile.branches, targetBranch);
 
-  // Don't fetch details for untracked branches — show the all-branches table instead
+  const defaultBranch = projectConfig.defaultBranch;
+
   if (!trackedBranch) {
-    await renderStatus();
+    console.log(theme.muted(`Branch "${targetBranch}" is not being tracked.`));
+    if (targetBranch !== defaultBranch) {
+      console.log(theme.muted(`  ${symbols.arrow} morg track              to start tracking it`));
+    }
+    console.log(
+      theme.muted(`  ${symbols.arrow} morg status <branch>   to check a specific branch`),
+    );
     return;
   }
-
-  const defaultBranch = projectConfig.defaultBranch;
 
   const ticketsProvider = await registry.tickets();
   const gh = projectConfig.integrations.github?.enabled !== false ? await registry.gh() : null;
@@ -60,7 +65,7 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
 
   const lines: string[] = [];
 
-  lines.push(`${theme.primaryBold('Branch:')} ${targetBranch}`);
+  lines.push(`${theme.primaryBold('Branch:')} ${trackedBranch.branchName}`);
   if (trackedBranch?.worktreePath) {
     lines.push(`${theme.muted('Worktree:')} ${trackedBranch.worktreePath}`);
   }
@@ -146,7 +151,7 @@ async function runStatusDetail(targetBranch: string, projectId: string): Promise
 }
 
 export async function runStatus(): Promise<void> {
-  await renderStatus();
+  await renderBranches();
 }
 
 export function registerStatusCommand(program: Command): void {
@@ -162,7 +167,7 @@ export function registerStatusCommand(program: Command): void {
         options: { branch?: string; short?: boolean; json?: boolean },
       ) => {
         if (options.short) {
-          return renderStatus({ branch: options.branch, short: true });
+          return renderBranches({ branch: options.branch, short: true });
         }
         let projectId: string;
         try {

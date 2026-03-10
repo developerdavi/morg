@@ -11,6 +11,8 @@ const COMMANDS = [
   'switch',
   'pr',
   'sync',
+  'ls',
+  'branches',
   'status',
   'standup',
   'prompt',
