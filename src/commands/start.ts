@@ -106,17 +106,20 @@ export async function runStart(
         await withSpinner(`Switching to ${branchName}...`, () => checkout(branchName));
       }
     } else {
-      // Switch to base, pull it, then create the new branch from it
       if (currentBranch !== base) {
         await handleDirtyTree(currentBranch, branchName);
-        await withSpinner(`Switching to ${base}...`, () => checkout(base));
+        const updated = await fetchAndUpdateBranch(base);
+        if (!updated) {
+          console.log(theme.warning(`  ${symbols.warning} Could not update ${base} — using local`));
+        }
+      } else {
+        try {
+          await withSpinner(`Pulling ${base}...`, () => pullBranch(base));
+        } catch {
+          console.log(theme.warning(`  ${symbols.warning} Could not pull ${base} — using local`));
+        }
       }
-      try {
-        await withSpinner(`Pulling ${base}...`, () => pullBranch(base));
-      } catch {
-        console.log(theme.warning(`  ${symbols.warning} Could not pull ${base} — using local`));
-      }
-      await withSpinner(`Creating branch ${branchName}...`, () => checkout(branchName, true));
+      await withSpinner(`Creating branch ${branchName}...`, () => checkout(branchName, true, base));
     }
     console.log(theme.success(`\n${symbols.success} On branch ${theme.primaryBold(branchName)}`));
   }
