@@ -65,7 +65,7 @@ export async function runStatusDetail(targetBranch: string, projectId: string): 
 
   const lines: string[] = [];
 
-  lines.push(`${theme.primaryBold('Branch:')} ${targetBranch}`);
+  lines.push(`${theme.primaryBold('Branch:')} ${trackedBranch.branchName}`);
   if (trackedBranch?.worktreePath) {
     lines.push(`${theme.muted('Worktree:')} ${trackedBranch.worktreePath}`);
   }
