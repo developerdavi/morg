@@ -30,6 +30,7 @@ export const GlobalConfigSchema = z.object({
   version: z.literal(1),
   githubUsername: z.string().min(1),
   anthropicApiKey: z.string().min(1).optional(),
+  aiProvider: z.enum(['anthropic-api', 'claude-cli']).optional(),
   autoStash: z.enum(['always', 'ask', 'never']).default('ask'),
   lastStashChoice: z.enum(['stash', 'skip']).optional(),
   autoDeleteMerged: z.enum(['always', 'ask', 'never']).default('ask'),
@@ -128,6 +129,7 @@ export const BranchSchema = z.object({
   prStatus: PrStatusSchema,
   worktreePath: z.string().nullable().default(null),
   lastAccessedAt: z.string().datetime().optional(),
+  ticketUrl: z.string().url().nullable().default(null),
 });
 
 export const BranchesFileSchema = z.object({

@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { configManager } from '../config/manager';
 import type { GlobalConfig } from '../config/schemas';
 import { theme, symbols } from '../ui/theme';
-import { intro, outro, text, password, confirm, select } from '../ui/prompts';
+import { intro, outro, text, password, select, multiselect } from '../ui/prompts';
 import { requireTrackedRepo } from '../utils/detect';
 
 async function runConfigWizard(existing: GlobalConfig | undefined): Promise<GlobalConfig> {
@@ -12,13 +12,26 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     validate: (v) => (v?.trim() ? undefined : 'Required'),
   });
 
-  const anthropicApiKeyRaw = await text({
-    message: 'Anthropic API key (sk-ant-...) — leave blank to skip',
-    initialValue: existing?.anthropicApiKey ?? '',
-    validate: (v) =>
-      !v?.trim() || v.startsWith('sk-ant-') ? undefined : 'Must start with sk-ant-',
-  });
-  const anthropicApiKey = anthropicApiKeyRaw.trim() || undefined;
+  const aiProvider = (await select({
+    message: 'AI provider',
+    options: [
+      { value: 'none', label: 'None (disable AI features)' },
+      { value: 'anthropic-api', label: 'Anthropic API (API key)' },
+      { value: 'claude-cli', label: 'Claude CLI (local claude binary)' },
+    ],
+    initialValue: (existing?.aiProvider ?? existing?.anthropicApiKey) ? 'anthropic-api' : 'none',
+  })) as GlobalConfig['aiProvider'] | 'none';
+
+  let anthropicApiKey: string | undefined;
+  if (aiProvider === 'anthropic-api') {
+    const raw = await text({
+      message: 'Anthropic API key (sk-ant-...)',
+      initialValue: existing?.anthropicApiKey ?? '',
+      validate: (v) =>
+        !v?.trim() || v.startsWith('sk-ant-') ? undefined : 'Must start with sk-ant-',
+    });
+    anthropicApiKey = raw.trim() || undefined;
+  }
 
   const autoStash = await select({
     message: 'Auto-stash dirty working tree on branch switch?',
@@ -50,13 +63,24 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     initialValue: existing?.autoUpdateTicketStatus ?? 'ask',
   });
 
-  const enableJira = await confirm({
-    message: 'Enable Jira integration?',
-    initialValue: existing?.integrations.jira?.enabled ?? false,
+  type Integration = 'jira' | 'notion' | 'slack';
+  const currentIntegrations: Integration[] = [];
+  if (existing?.integrations.jira?.enabled) currentIntegrations.push('jira');
+  if (existing?.integrations.notion?.enabled) currentIntegrations.push('notion');
+  if (existing?.integrations.slack?.enabled) currentIntegrations.push('slack');
+
+  const enabledIntegrations = await multiselect<Integration>({
+    message: 'Integrations to enable (space to toggle)',
+    options: [
+      { value: 'jira', label: 'Jira', hint: 'tickets provider' },
+      { value: 'notion', label: 'Notion', hint: 'tickets provider' },
+      { value: 'slack', label: 'Slack', hint: 'messaging / standup' },
+    ],
+    initialValues: currentIntegrations,
   });
 
   let jiraConfig: GlobalConfig['integrations']['jira'] = undefined;
-  if (enableJira) {
+  if (enabledIntegrations.includes('jira')) {
     const baseUrl = await text({
       message: 'Jira base URL (e.g. https://yourorg.atlassian.net)',
       initialValue: existing?.integrations.jira?.baseUrl,
@@ -78,13 +102,21 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     jiraConfig = { enabled: true, baseUrl, userEmail, apiToken };
   }
 
-  const enableSlack = await confirm({
-    message: 'Enable Slack integration?',
-    initialValue: existing?.integrations.slack?.enabled ?? false,
-  });
+  let notionConfig: GlobalConfig['integrations']['notion'] = undefined;
+  if (enabledIntegrations.includes('notion')) {
+    const existingNotionToken = existing?.integrations.notion?.apiToken;
+    const notionApiTokenRaw = await password({
+      message: existingNotionToken
+        ? 'Notion integration token (secret_...) — leave blank to keep existing'
+        : 'Notion integration token (secret_...)',
+      validate: (v) => (!v?.trim() && !existingNotionToken ? 'Required' : undefined),
+    });
+    const apiToken = notionApiTokenRaw.trim() || existingNotionToken!;
+    notionConfig = { enabled: true, apiToken };
+  }
 
   let slackConfig: GlobalConfig['integrations']['slack'] = undefined;
-  if (enableSlack) {
+  if (enabledIntegrations.includes('slack')) {
     const existingSlackToken = existing?.integrations.slack?.apiToken;
     const slackApiTokenRaw = await password({
       message: existingSlackToken
@@ -103,28 +135,11 @@ async function runConfigWizard(existing: GlobalConfig | undefined): Promise<Glob
     slackConfig = { enabled: true, apiToken, standupChannel: standupChannel.trim() || undefined };
   }
 
-  const enableNotion = await confirm({
-    message: 'Enable Notion integration?',
-    initialValue: existing?.integrations.notion?.enabled ?? false,
-  });
-
-  let notionConfig: GlobalConfig['integrations']['notion'] = undefined;
-  if (enableNotion) {
-    const existingNotionToken = existing?.integrations.notion?.apiToken;
-    const notionApiTokenRaw = await password({
-      message: existingNotionToken
-        ? 'Notion integration token (secret_...) — leave blank to keep existing'
-        : 'Notion integration token (secret_...)',
-      validate: (v) => (!v?.trim() && !existingNotionToken ? 'Required' : undefined),
-    });
-    const apiToken = notionApiTokenRaw.trim() || existingNotionToken!;
-    notionConfig = { enabled: true, apiToken };
-  }
-
   return {
     version: 1,
     githubUsername,
     anthropicApiKey,
+    aiProvider: aiProvider === 'none' ? undefined : aiProvider,
     autoStash,
     lastStashChoice: existing?.lastStashChoice,
     autoDeleteMerged,
@@ -162,6 +177,7 @@ async function runConfig(options: { show?: boolean }): Promise<void> {
     console.log(`  githubUsername:  ${theme.primary(config.githubUsername)}`);
     if (config.anthropicApiKey)
       console.log(`  anthropicApiKey: ${theme.muted(redact(config.anthropicApiKey))}`);
+    if (config.aiProvider) console.log(`  aiProvider:      ${theme.primary(config.aiProvider)}`);
     console.log(`  autoStash:            ${theme.primary(config.autoStash)}`);
     console.log(`  autoDeleteMerged:     ${theme.primary(config.autoDeleteMerged)}`);
     console.log(`  autoUpdateTicketStatus: ${theme.primary(config.autoUpdateTicketStatus)}`);

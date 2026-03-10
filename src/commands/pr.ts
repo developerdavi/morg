@@ -13,7 +13,7 @@ import { requireTrackedRepo } from '../utils/detect';
 import { findBranchCaseInsensitive } from '../utils/ticket';
 import { theme, symbols } from '../ui/theme';
 import { withSpinner } from '../ui/spinner';
-import { intro, outro, text } from '../ui/prompts';
+import { intro, outro, text, editor } from '../ui/prompts';
 import { registry } from '../services/registry';
 
 async function runPrCreate(options: {
@@ -65,7 +65,13 @@ async function runPrCreate(options: {
         const diff = await withSpinner('Getting diff...', () => getDiffWithBase(defaultBranch));
         bodyDefault = await withSpinner('Generating PR description with Claude...', () =>
           ai.complete(
-            prDescriptionPrompt(diff, currentBranch, trackedBranch?.ticketTitle ?? undefined),
+            prDescriptionPrompt(
+              diff,
+              currentBranch,
+              trackedBranch?.ticketTitle ?? undefined,
+              trackedBranch?.ticketId ?? undefined,
+              trackedBranch?.ticketUrl ?? undefined,
+            ),
             SYSTEM_PR_DESCRIPTION,
           ),
         );
@@ -80,10 +86,9 @@ async function runPrCreate(options: {
 
   const body = options.yes
     ? bodyDefault
-    : await text({
-        message: 'PR body (optional)',
+    : await editor({
+        message: 'PR body (Markdown)',
         initialValue: bodyDefault,
-        placeholder: 'Leave blank to skip',
       });
 
   const remoteHasBase =
