@@ -1,5 +1,8 @@
+import { writeFileSync, readFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execa } from 'execa';
 import * as clack from '@clack/prompts';
-import inquirerEditor from '@inquirer/editor';
 
 export function intro(title: string): void {
   clack.intro(title);
@@ -60,7 +63,22 @@ export async function select<T extends string>(opts: {
 }
 
 export async function editor(opts: { message: string; initialValue?: string }): Promise<string> {
-  return inquirerEditor({ message: opts.message, default: opts.initialValue });
+  const tmpFile = join(tmpdir(), `morg-${Date.now()}.md`);
+  writeFileSync(tmpFile, opts.initialValue ?? '', 'utf-8');
+
+  const editorCmd = process.env.VISUAL ?? process.env.EDITOR ?? 'vi';
+  clack.log.step(`${opts.message} — opening ${editorCmd}`);
+
+  try {
+    await execa(editorCmd, [tmpFile], { stdio: 'inherit', reject: false });
+    return readFileSync(tmpFile, 'utf-8').trim();
+  } finally {
+    try {
+      unlinkSync(tmpFile);
+    } catch {
+      // ignore cleanup errors
+    }
+  }
 }
 
 export { clack };

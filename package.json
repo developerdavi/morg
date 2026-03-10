@@ -26,7 +26,6 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@clack/prompts": "^1.1.0",
-    "@inquirer/editor": "^5.0.8",
     "@notionhq/client": "^5.11.1",
     "@slack/web-api": "^7.14.1",
     "boxen": "^8.0.0",
