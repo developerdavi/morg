@@ -65,7 +65,13 @@ async function runPrCreate(options: {
         const diff = await withSpinner('Getting diff...', () => getDiffWithBase(defaultBranch));
         bodyDefault = await withSpinner('Generating PR description with Claude...', () =>
           ai.complete(
-            prDescriptionPrompt(diff, currentBranch, trackedBranch?.ticketTitle ?? undefined),
+            prDescriptionPrompt(
+              diff,
+              currentBranch,
+              trackedBranch?.ticketTitle ?? undefined,
+              trackedBranch?.ticketId ?? undefined,
+              trackedBranch?.ticketUrl ?? undefined,
+            ),
             SYSTEM_PR_DESCRIPTION,
           ),
         );

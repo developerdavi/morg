@@ -1,32 +1,59 @@
 export const SYSTEM_PR_DESCRIPTION = `You are a senior software engineer writing a GitHub pull request description.
-Write a clear, concise PR description in markdown. Include:
-- A brief summary of what the PR does
-- Key changes made
-- Any testing notes
-Be direct and technical. No fluff.`;
+Output ONLY the following Markdown body — no title, no preamble, no extra sections:
+
+## Ticket
+<ticket reference: "[ID](url): title" if a URL is provided, otherwise "ID: title", or "N/A">
+
+## Summary
+<2–5 bullet points: what changed and why>
+
+## Test plan
+<bullet-point checklist: how to verify the change>
+
+Start your response directly with "## Ticket". Be direct and technical. No fluff.`;
 
 export const SYSTEM_PR_REVIEW = `You are a senior software engineer reviewing a pull request.
-Provide a concise summary of the diff, highlighting:
-- What the change does
-- Any potential concerns or edge cases
-- Overall assessment (looks good / needs attention)
+Provide a concise review with these sections:
+
+**What it does** — 1–3 bullets summarising the change
+
+**Potential concerns** — numbered list of issues/edge cases, or "None identified"
+
+**Overall assessment** — one line: ✅ Looks good | ⚠ Needs attention | ❌ Needs rework
+
 Be brief and direct.`;
 
-export const SYSTEM_STANDUP = `You are helping a developer write a standup update.
-Based on the recent git activity and task data, generate a brief standup:
-- What I did yesterday
-- What I'm doing today
-- Any blockers
+export const SYSTEM_STANDUP = `You are helping a developer write a daily standup update.
+Output exactly this Markdown structure:
 
-Keep it to 3-5 bullet points total. Be concise.`;
+**Yesterday**
+- <what was completed>
+
+**Today**
+- <what is planned>
+
+**Blockers**
+- <blockers, or "None">
+
+1–3 bullets per section. Be concise and specific.`;
 
 export function prDescriptionPrompt(
   diff: string,
   branchName: string,
   ticketTitle?: string,
+  ticketId?: string,
+  ticketUrl?: string,
 ): string {
+  let ticketRef = 'N/A';
+  if (ticketId) {
+    const label = ticketTitle ? `${ticketId}: ${ticketTitle}` : ticketId;
+    ticketRef = ticketUrl ? `[${label}](${ticketUrl})` : label;
+  } else if (ticketTitle) {
+    ticketRef = ticketTitle;
+  }
+
   return `Generate a PR description for this branch: ${branchName}
-${ticketTitle ? `Ticket: ${ticketTitle}` : ''}
+Ticket: ${ticketRef}
 
 Diff:
 \`\`\`diff

@@ -28,6 +28,7 @@ export async function runStart(
   let branchName: string;
   let ticketId: string | null = null;
   let ticketTitle: string | null = null;
+  let ticketUrl: string | null = null;
 
   if (isTicketId(input)) {
     const candidateId = input.trim().toUpperCase();
@@ -42,6 +43,7 @@ export async function runStart(
         const ticket = await fetchTicket(ticketsProvider, candidateId);
         ticketId = ticket.key;
         ticketTitle = ticket.title;
+        ticketUrl = ticket.url ?? null;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.log(theme.warning(`  ${symbols.warning} Could not fetch ticket: ${msg}`));
@@ -134,6 +136,7 @@ export async function runStart(
       branchName,
       ticketId,
       ticketTitle,
+      ticketUrl,
       status: 'active',
       createdAt: now,
       updatedAt: now,

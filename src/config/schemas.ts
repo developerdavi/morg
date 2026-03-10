@@ -129,6 +129,7 @@ export const BranchSchema = z.object({
   prStatus: PrStatusSchema,
   worktreePath: z.string().nullable().default(null),
   lastAccessedAt: z.string().datetime().optional(),
+  ticketUrl: z.string().url().nullable().default(null),
 });
 
 export const BranchesFileSchema = z.object({
