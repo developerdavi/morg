@@ -114,6 +114,9 @@ All JSON state is read/written exclusively through `configManager` (never direct
 
 Commands that require a tracked repo call `requireTrackedRepo()` to get the `projectId`, then use `configManager.getBranches(projectId)` etc.
 
+### Git worktrees
+Worktrees live at `../morg-worktrees/<branch>/` relative to the main repo. Run `pnpm install` in each worktree to set up dependencies — pnpm's content-addressable store means installs are fast (dependencies are symlinked from the store, not re-downloaded).
+
 ### execa convention
 Always `{ reject: false }` — check `result.exitCode` instead of catching exceptions.
 
