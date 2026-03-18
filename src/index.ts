@@ -21,6 +21,7 @@ import { registerTicketsCommand } from './commands/tickets';
 import { registerInstallClaudeSkillCommand } from './commands/install-claude-skill';
 import { registerShellInitCommand } from './commands/shell-init';
 import { registerWorktreeCommand } from './commands/worktree';
+import { registerCompletionsCommand } from './commands/completions';
 import { getCurrentBranch } from './git/index';
 import { configManager } from './config/manager';
 import { findBranchCaseInsensitive } from './utils/ticket';
@@ -56,7 +57,12 @@ program.action(async () => {
   }
 });
 
-const NO_CONFIG_COMMANDS = new Set(['config', 'install-claude-skill', 'shell-init']);
+const NO_CONFIG_COMMANDS = new Set([
+  'config',
+  'install-claude-skill',
+  'shell-init',
+  '_completions',
+]);
 program.hook('preAction', async (_thisCommand, actionCommand) => {
   if (!NO_CONFIG_COMMANDS.has(actionCommand.name())) await requireConfig();
 });
@@ -81,5 +87,6 @@ registerTicketsCommand(program);
 registerInstallClaudeSkillCommand(program);
 registerShellInitCommand(program);
 registerWorktreeCommand(program);
+registerCompletionsCommand(program);
 
 program.parseAsync(process.argv).catch(handleError);
