@@ -72,6 +72,11 @@ _morg_completion() {
     pr)
       COMPREPLY=( $(compgen -W "create review view" -- "\${cur}") )
       ;;
+    view)
+      if [[ "\${COMP_WORDS[1]}" == "pr" ]]; then
+        COMPREPLY=( $(compgen -W "$(command morg _completions branches 2>/dev/null)" -- "\${cur}") )
+      fi
+      ;;
     worktree)
       COMPREPLY=( $(compgen -W "list clean" -- "\${cur}") )
       ;;
@@ -84,6 +89,16 @@ _morg_completion() {
     completion)
       COMPREPLY=( $(compgen -W "bash zsh" -- "\${cur}") )
       ;;
+    switch|complete|delete|untrack)
+      COMPREPLY=( $(compgen -W "$(command morg _completions branches 2>/dev/null)" -- "\${cur}") )
+      ;;
+    track)
+      if [[ \${COMP_CWORD} == 2 ]]; then
+        COMPREPLY=( $(compgen -W "$(command morg _completions branches 2>/dev/null)" -- "\${cur}") )
+      elif [[ \${COMP_CWORD} == 3 ]]; then
+        COMPREPLY=( $(compgen -W "$(command morg _completions tickets 2>/dev/null)" -- "\${cur}") )
+      fi
+      ;;
     start)
       COMPREPLY=( $(compgen -W "--worktree --base" -- "\${cur}") )
       ;;
@@ -94,7 +109,7 @@ _morg_completion() {
       COMPREPLY=( $(compgen -W "--json --short" -- "\${cur}") )
       ;;
     tickets|ticket)
-      COMPREPLY=( $(compgen -W "--plain --json" -- "\${cur}") )
+      COMPREPLY=( $(compgen -W "--plain --json $(command morg _completions tickets 2>/dev/null)" -- "\${cur}") )
       ;;
     *)
       ;;
@@ -128,9 +143,15 @@ ${commandDefs}
     args)
       case \$words[2] in
         pr)
-          local -a subcmds
-          subcmds=('create' 'review' 'view')
-          _describe 'subcommand' subcmds
+          if [[ \$CURRENT -eq 4 && \$words[3] == "view" ]]; then
+            local -a branches
+            branches=(\${(f)"$(command morg _completions branches 2>/dev/null)"})
+            compadd -a branches
+          else
+            local -a subcmds
+            subcmds=('create' 'review' 'view')
+            _describe 'subcommand' subcmds
+          fi
           ;;
         worktree)
           local -a subcmds
@@ -162,6 +183,22 @@ ${commandDefs}
           shells=('bash' 'zsh')
           _describe 'shell' shells
           ;;
+        switch|complete|delete|untrack)
+          local -a branches
+          branches=(\${(f)"$(command morg _completions branches 2>/dev/null)"})
+          compadd -a branches
+          ;;
+        track)
+          if [[ \$CURRENT -eq 3 ]]; then
+            local -a branches
+            branches=(\${(f)"$(command morg _completions branches 2>/dev/null)"})
+            compadd -a branches
+          elif [[ \$CURRENT -eq 4 ]]; then
+            local -a tickets
+            tickets=(\${(f)"$(command morg _completions tickets 2>/dev/null)"})
+            compadd -a tickets
+          fi
+          ;;
         start)
           _arguments '--worktree[Create git worktree]' '--base[Base branch]'
           ;;
@@ -169,7 +206,10 @@ ${commandDefs}
           _arguments '--json[Output as JSON]' '--short[Short output]'
           ;;
         tickets|ticket)
+          local -a tickets
+          tickets=(\${(f)"$(command morg _completions tickets 2>/dev/null)"})
           _arguments '--plain[Plain output]' '--json[Output as JSON]'
+          compadd -a tickets
           ;;
       esac
       ;;
